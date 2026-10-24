@@ -48,6 +48,7 @@ model Brand {
   name          String
   slug          String
   supportEmail  String?
+  logoUrl       String?
   demoSession   DemoSession    @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
   products      ProductModel[]
   orders        PurchaseOrder[]

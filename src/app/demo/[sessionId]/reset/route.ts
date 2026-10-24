@@ -11,5 +11,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return new Response("Demo session not found", { status: 404 });
     throw error;
   }
-  return NextResponse.redirect(new URL(`/demo/${sessionId}/customer`, request.url), 303);
+  return NextResponse.redirect(new URL(`/demo/${sessionId}/setup?notice=cleared`, request.url), 303);
 }

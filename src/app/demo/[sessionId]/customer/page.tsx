@@ -26,14 +26,17 @@ export default async function CustomerDashboard({ params, searchParams }: Props)
   const { sessionId } = await params;
   if (!isUuid(sessionId)) notFound();
   const query = await searchParams;
-  const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId } });
+  const [customer, workspaceBrand] = await Promise.all([
+    db.customer.findFirst({ where: { demoSessionId: sessionId } }),
+    db.brand.findFirst({ where: { demoSessionId: sessionId }, select: { name: true, logoUrl: true } }),
+  ]);
   if (!customer) {
     return (
-      <main className="page-wrap">
+      <><CustomerNav sessionId={sessionId} customerName="Customer" brandName={workspaceBrand?.name} brandLogoUrl={workspaceBrand?.logoUrl}/><main className="page-wrap content">
         <div className="blank-state" style={{ marginTop: 60 }}>
-          This demo session was not found. <Link href="/demo">Start a new demo →</Link>
+          <h1>Register your first product</h1><p>Enter the unit ID from your product to create your customer space.</p><Link className="action" href={`/demo/${sessionId}/register`}>Register a product</Link>
         </div>
-      </main>
+      </main></>
     );
   }
 
@@ -46,7 +49,7 @@ export default async function CustomerDashboard({ params, searchParams }: Props)
     orderBy: { registeredAt: "desc" },
   });
 
-  const brand = registrations[0]?.unit.brand || { name: "Kestrel Audio" };
+  const brand = registrations[0]?.unit.brand || workspaceBrand || { name: "Your brand", logoUrl: null };
 
   const claims = registrations
     .flatMap((registration) =>
@@ -87,7 +90,7 @@ export default async function CustomerDashboard({ params, searchParams }: Props)
 
   return (
     <>
-      <CustomerNav sessionId={sessionId} customerName={customer.name} brandName={brand.name} />
+      <CustomerNav sessionId={sessionId} customerName={customer.name} brandName={brand.name} brandLogoUrl={brand.logoUrl} />
       <main className="page-wrap content" style={{ paddingTop: 32 }}>
         {/* Header Section */}
         <div

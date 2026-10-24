@@ -27,19 +27,19 @@ export default async function RegisterPage({ params, searchParams }: Props) {
     db.productModel.findFirst({ where: { slug: productSlug, brand: { slug: brandSlug, demoSessionId: sessionId } }, include: { brand: true } }),
     db.customer.findFirst({ where: { demoSessionId: sessionId } }),
   ]);
-  if (!product || !customer) notFound();
+  if (!product) notFound();
   const serialNumber = (query.serialNumber || "").trim().toUpperCase().slice(0, 100);
   const found = serialNumber ? await db.productUnit.findFirst({
     where: { serialNumber, brandId: product.brandId, productModelId: product.id },
     include: { purchaseOrder: true, registration: true },
   }) : null;
-  const unit = found && found.purchaseOrder.brandId === product.brandId && (!found.purchaseOrder.customerId || found.purchaseOrder.customerId === customer.id) && (!found.registration || found.registration.customerId === customer.id) ? found : null;
+  const unit = found && found.purchaseOrder.brandId === product.brandId ? found : null;
   const delivered = unit?.purchaseOrder.deliveredOn;
   const eligible = !!delivered && dateOnly(delivered).getTime() <= dateOnly(new Date()).getTime();
   const checkError = serialNumber ? !unit ? "not-found" : !eligible ? "not-delivered" : undefined : undefined;
   const error = query.error || checkError;
   const registrationPath = `/demo/${sessionId}/register/${brandSlug}/${productSlug}`;
-  return <><CustomerNav sessionId={sessionId} customerName={customer.name}/><main className="page-wrap content"><div className="form-shell">
+  return <><CustomerNav sessionId={sessionId} customerName={customer?.name || "Customer"} brandName={product.brand.name} brandLogoUrl={product.brand.logoUrl}/><main className="page-wrap content"><div className="form-shell">
     <header className="form-header">
       <Link href={`/demo/${sessionId}/register`} className="muted" style={{ fontSize: 12 }}><ArrowLeft size={13} style={{ verticalAlign: "middle" }}/> All products</Link>
       <div className={styles.productHeading}>
@@ -68,8 +68,8 @@ export default async function RegisterPage({ params, searchParams }: Props) {
       </div>}
       {unit && eligible && !unit.registration && <form action={registerWarrantyAction} style={{ marginTop: 25 }}>
         <input type="hidden" name="sessionId" value={sessionId}/><input type="hidden" name="brandSlug" value={brandSlug}/><input type="hidden" name="productSlug" value={productSlug}/><input type="hidden" name="serialNumber" value={unit.serialNumber}/>
-        <div className="field"><label htmlFor="customerName">Your name</label><input id="customerName" name="customerName" defaultValue={customer.name} required maxLength={100}/></div>
-        <div className="field"><label htmlFor="email">Contact email</label><input id="email" name="email" type="email" defaultValue={customer.email} required maxLength={200}/></div>
+        <div className="field"><label htmlFor="customerName">Your name</label><input id="customerName" name="customerName" defaultValue={customer?.name || ""} required maxLength={100}/></div>
+        <div className="field"><label htmlFor="email">Contact email</label><input id="email" name="email" type="email" defaultValue={customer?.email || ""} required maxLength={200}/></div>
         <CustomerSubmit label="Register warranty" pendingLabel="Registering…"/>
       </form>}
       <p className={styles.helpText} style={{ marginTop: 22 }}><ShieldCheck size={14} style={{ verticalAlign: "middle", marginRight: 6 }}/> Registering does not restart or extend your coverage. No email is sent in this demo.</p>

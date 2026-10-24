@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireBrand, isUuid } from "@/lib/brand";
 import { dateOnly } from "@/lib/dates";
-import { saveProductImage, removeNewProductImage } from "@/lib/product-images";
+import { saveBrandLogo, saveProductImage, removeNewProductImage } from "@/lib/product-images";
 
 export type BrandActionState = { error?: string; success?: string };
 class FormError extends Error {}
@@ -76,6 +76,42 @@ function refreshWorkspace(sessionId: string) {
   revalidatePath(`/demo/${sessionId}`, "layout");
 }
 
+function brandSlug(name: string, id: string) {
+  const base = name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "brand";
+  return `${base}-${id.slice(0, 8)}`;
+}
+
+async function brandLogo(form: FormData, sessionId: string, brandId: string, current: string | null) {
+  if (form.get("removeLogo") === "on") return { logoUrl: null, uploaded: false };
+  const file = form.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { logoUrl: current, uploaded: false };
+  try { return { logoUrl: await saveBrandLogo(sessionId, brandId, file), uploaded: true }; }
+  catch (error) { throw new FormError(error instanceof Error ? error.message.replace("product image", "brand logo") : "The logo could not be saved."); }
+}
+
+export async function createBrandAction(sessionId: string, _state: BrandActionState, form: FormData): Promise<BrandActionState> {
+  if (!isUuid(sessionId)) return { error: "Workspace not found." };
+  const brandId = randomUUID();
+  let uploadedUrl: string | null = null;
+  try {
+    const session = await db.demoSession.findUnique({ where: { id: sessionId }, select: { id: true } });
+    if (!session) throw new FormError("Workspace not found.");
+    const existing = await db.brand.findFirst({ where: { demoSessionId: sessionId }, select: { id: true } });
+    if (existing) redirect(`/demo/${sessionId}/brand`);
+    const name = textField(form, "name", 120, true);
+    const supportEmail = textField(form, "supportEmail", 200) || null;
+    if (supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) throw new FormError("Enter a valid support email address.");
+    const logo = await brandLogo(form, sessionId, brandId, null);
+    if (logo.uploaded) uploadedUrl = logo.logoUrl;
+    await db.brand.create({ data: { id: brandId, demoSessionId: sessionId, name, slug: brandSlug(name, brandId), supportEmail, logoUrl: logo.logoUrl } });
+  } catch (error) {
+    if (uploadedUrl) await removeNewProductImage(uploadedUrl);
+    return actionError(error);
+  }
+  refreshWorkspace(sessionId);
+  redirect(`/demo/${sessionId}/brand`);
+}
+
 export async function createProductAction(sessionId: string, _state: BrandActionState, form: FormData): Promise<BrandActionState> {
   const brand = await requireBrand(sessionId);
   const productId = randomUUID();
@@ -134,12 +170,19 @@ export async function addProductUnitAction(sessionId: string, productId: string,
 
 export async function updateBrandAction(sessionId: string, _state: BrandActionState, form: FormData): Promise<BrandActionState> {
   const brand = await requireBrand(sessionId);
+  let uploadedUrl: string | null = null;
   try {
     const name = textField(form, "name", 120, true);
     const supportEmail = textField(form, "supportEmail", 200) || null;
     if (supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) throw new FormError("Enter a valid support email address.");
-    await db.brand.update({ where: { id: brand.id }, data: { name, supportEmail } });
-  } catch (error) { return actionError(error); }
+    const logo = await brandLogo(form, sessionId, brand.id, brand.logoUrl);
+    if (logo.uploaded) uploadedUrl = logo.logoUrl;
+    await db.brand.update({ where: { id: brand.id }, data: { name, supportEmail, logoUrl: logo.logoUrl } });
+    if (brand.logoUrl && brand.logoUrl !== logo.logoUrl) await removeNewProductImage(brand.logoUrl);
+  } catch (error) {
+    if (uploadedUrl) await removeNewProductImage(uploadedUrl);
+    return actionError(error);
+  }
   refreshWorkspace(sessionId);
   return { success: "Brand details saved." };
 }

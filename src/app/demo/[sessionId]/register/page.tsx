@@ -16,8 +16,7 @@ export default async function ProductChooser({ params }: { params: Promise<{ ses
     db.customer.findFirst({ where: { demoSessionId: sessionId } }),
     db.productModel.findMany({ where: { brand: { demoSessionId: sessionId } }, include: { brand: true }, orderBy: { name: "asc" } }),
   ]);
-  if (!customer) notFound();
-  return <><CustomerNav sessionId={sessionId} customerName={customer.name}/><main className="page-wrap content">
+  return <><CustomerNav sessionId={sessionId} customerName={customer?.name || "Customer"} brandName={products[0]?.brand.name} brandLogoUrl={products[0]?.brand.logoUrl}/><main className="page-wrap content">
     <div className="section-head" style={{ marginTop: 36 }}><div><Link className="muted" href={`/demo/${sessionId}/customer`} style={{ fontSize: 12 }}><ArrowLeft size={13} style={{ verticalAlign: "middle" }}/> My products</Link><h1 style={{ margin: "14px 0 8px", fontSize: 31, letterSpacing: -1 }}>Register your product.</h1><p>Select your product, then enter the unit ID stamped on it.</p></div></div>
     <div className={styles.catalog}>{products.map((product) => <article className={styles.catalogCard} key={product.id}>
       <ProductVisual imageUrl={product.imageUrl} name={product.name} kind={product.slug.includes("charge") ? "charger" : "headphones"}/>

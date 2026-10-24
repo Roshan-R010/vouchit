@@ -2,15 +2,26 @@ import { expect, test } from "@playwright/test";
 
 test("business product, registration, warranty card and claim stay connected", async ({ page }) => {
   const suffix = Date.now().toString().slice(-7);
+  const brandName = `Orbit Labs ${suffix}`;
   const productName = `Orbit Buds ${suffix}`;
   const serial = `ORB-${suffix}`;
   const order = `ORD-${suffix}`;
 
   await page.goto("/demo?view=brand");
-  await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/brand$/);
+  await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/setup$/);
   const brandUrl = new URL(page.url());
   const sessionId = brandUrl.pathname.split("/")[2];
   const brandBase = `/demo/${sessionId}/brand`;
+
+  await page.getByLabel("Brand name").fill(brandName);
+  await page.locator('input[name="logo"]').setInputFiles({
+    name: "orbit-logo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"),
+  });
+  await page.getByRole("button", { name: "Create brand" }).click();
+  await expect(page).toHaveURL(`${brandBase}`);
+  await expect(page.getByText(brandName, { exact: true }).first()).toBeVisible();
 
   await page.goto(`${brandBase}/products/new`);
   await page.getByLabel("Product name").fill(productName);

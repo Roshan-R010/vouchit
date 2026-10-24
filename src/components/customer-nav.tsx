@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 
-export function CustomerNav({ sessionId, customerName = "Aarav Demo", brandName = "Kestrel Audio" }: { sessionId?: string; customerName?: string; brandName?: string }) {
+export function CustomerNav({ sessionId, customerName = "Customer", brandName, brandLogoUrl }: { sessionId?: string; customerName?: string; brandName?: string; brandLogoUrl?: string | null }) {
   const pathname = usePathname();
   const reducedMotion = useReducedMotion();
   const root = sessionId ? `/demo/${sessionId}` : "/";
@@ -21,7 +21,7 @@ export function CustomerNav({ sessionId, customerName = "Aarav Demo", brandName 
       </Link>;
     })}</nav>
     <div className="topbar-end">
-      {sessionId && <span style={{ fontSize: 12, color: "#777b78", fontWeight: 450, marginRight: 8 }}>{brandName} · Customer portal</span>}
+      {sessionId && brandName && <span style={{ fontSize: 12, color: "#777b78", fontWeight: 450, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>{brandLogoUrl && <img src={brandLogoUrl} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: "contain" }}/>} {brandName} · Customer portal</span>}
       {sessionId && <Link className={`nav-link brand-switch ${pathname.includes("/brand") ? "active" : ""}`} href={`${root}/brand`} style={{ fontSize: 11, color: "#777b78", textDecoration: "none", marginRight: 8 }}>Brand view</Link>}
       {sessionId && <><span className="avatar">{customerName.slice(0, 1).toUpperCase()}</span><span style={{ fontSize: 13, fontWeight: 600, color: "#171918" }}>{customerName}</span></>}
     </div>

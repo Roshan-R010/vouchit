@@ -1,4 +1,3 @@
-import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -30,11 +29,11 @@ async function ensureBucket() {
   return config;
 }
 
-function imagePath(sessionId: string, productId: string, filename: string) {
-  if (!uuidPattern.test(sessionId) || !uuidPattern.test(productId) || !imagePattern.test(filename)) {
+function imagePath(sessionId: string, assetId: string, filename: string) {
+  if (!uuidPattern.test(sessionId) || !uuidPattern.test(assetId) || !imagePattern.test(filename)) {
     throw new Error("Invalid image location.");
   }
-  return path.join(process.cwd(), ".vouch", "uploads", sessionId, productId, filename);
+  return path.join(process.cwd(), ".vouch", "uploads", sessionId, assetId, filename);
 }
 
 function imageExtension(bytes: Buffer) {
@@ -44,23 +43,33 @@ function imageExtension(bytes: Buffer) {
   throw new Error("Choose a PNG, JPEG, or WebP product image.");
 }
 
-export async function saveProductImage(sessionId: string, productId: string, file: File) {
+type ImageUpload = { size: number; arrayBuffer: () => Promise<ArrayBuffer> };
+
+async function saveImage(sessionId: string, assetId: string, file: ImageUpload, route: "product-images" | "brand-images") {
   if (file.size > MAX_PRODUCT_IMAGE_BYTES) throw new Error("The image must be 5 MB or smaller.");
   const bytes = Buffer.from(await file.arrayBuffer());
   const extension = imageExtension(bytes);
   const filename = `${randomUUID()}.${extension}`;
   const storage = await ensureBucket();
   if (storage) {
-    const objectPath = `${sessionId}/${productId}/${filename}`;
+    const objectPath = `${sessionId}/${assetId}/${filename}`;
     const contentType = extension === "jpg" ? "image/jpeg" : `image/${extension}`;
     const { error } = await storage.client.storage.from(STORAGE_BUCKET).upload(objectPath, bytes, { contentType, cacheControl: "31536000", upsert: false });
     if (error) throw new Error(`Supabase Storage: ${error.message}`);
     return storage.client.storage.from(STORAGE_BUCKET).getPublicUrl(objectPath).data.publicUrl;
   }
-  const filePath = imagePath(sessionId, productId, filename);
+  const filePath = imagePath(sessionId, assetId, filename);
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, bytes, { flag: "wx" });
-  return `/demo/${sessionId}/product-images/${productId}/${filename}`;
+  return `/demo/${sessionId}/${route}/${assetId}/${filename}`;
+}
+
+export async function saveProductImage(sessionId: string, productId: string, file: ImageUpload) {
+  return saveImage(sessionId, productId, file, "product-images");
+}
+
+export async function saveBrandLogo(sessionId: string, brandId: string, file: ImageUpload) {
+  return saveImage(sessionId, brandId, file, "brand-images");
 }
 
 export async function readProductImage(sessionId: string, productId: string, filename: string) {
@@ -76,7 +85,7 @@ export async function removeNewProductImage(imageUrl: string) {
     return;
   }
   const parts = imageUrl.split("/");
-  if (parts.length !== 6 || parts[1] !== "demo" || parts[3] !== "product-images") return;
+  if (parts.length !== 6 || parts[1] !== "demo" || !["product-images", "brand-images"].includes(parts[3])) return;
   await unlink(imagePath(parts[2], parts[4], parts[5])).catch(() => undefined);
 }
 

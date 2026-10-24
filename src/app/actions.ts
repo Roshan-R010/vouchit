@@ -21,15 +21,15 @@ export async function registerWarrantyAction(formData: FormData) {
   const fail = (error: string): never => redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=${error}`);
   if (!brandSlug || !productSlug || !serialNumber || serialNumber.length > 100) fail("missing");
   if (!customerName || customerName.length > 100 || email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("contact");
-  const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId } });
   const unit = await db.productUnit.findFirst({
     where: { serialNumber, brand: { slug: brandSlug, demoSessionId: sessionId }, productModel: { slug: productSlug } },
     include: { productModel: true, purchaseOrder: true, registration: true },
   });
-  if (!customer || !unit) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-found`);
-  if (unit.productModel.brandId !== unit.brandId || unit.purchaseOrder.brandId !== unit.brandId || (unit.purchaseOrder.customerId && unit.purchaseOrder.customerId !== customer.id)) fail("not-found");
+  if (!unit) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-found`);
+  const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId, email } });
+  if (unit.productModel.brandId !== unit.brandId || unit.purchaseOrder.brandId !== unit.brandId || (unit.purchaseOrder.customerId && customer && unit.purchaseOrder.customerId !== customer.id)) fail("not-found");
   if (unit.registration) {
-    if (unit.registration.customerId !== customer.id) fail("not-found");
+    if (!customer || unit.registration.customerId !== customer.id) fail("not-found");
     redirect(`/demo/${sessionId}/customer/products/${unit.id}?notice=already-registered`);
   }
   const deliveredOn = unit.purchaseOrder.deliveredOn;
@@ -38,16 +38,17 @@ export async function registerWarrantyAction(formData: FormData) {
   const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
   try {
     await db.$transaction(async (tx) => {
-      const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, customerId: customer.id, coverageStartsOn: start, coverageEndsOn: end } });
+      const registeredCustomer = customer ?? await tx.customer.create({ data: { demoSessionId: sessionId, name: customerName, email } });
+      if (customer) await tx.customer.update({ where: { id: customer.id }, data: { name: customerName, email } });
+      const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, customerId: registeredCustomer.id, coverageStartsOn: start, coverageEndsOn: end } });
       await tx.demoNotification.create({ data: {
         demoSessionId: sessionId, type: NotificationType.WARRANTY_REGISTERED, recipientLabel: "Customer",
         subject: "Your warranty is registered", previewBody: `${unit.productModel.name} (${serialNumber}) is covered from ${start.toISOString().slice(0, 10)} through ${end.toISOString().slice(0, 10)}. Preview — not sent.`, relatedId: registration.id,
       } });
-      await tx.customer.update({ where: { id: customer.id }, data: { name: customerName, email } });
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const existing = await db.warrantyRegistration.findFirst({ where: { unitId: unit.id, customerId: customer.id } });
+      const existing = await db.warrantyRegistration.findFirst({ where: { unitId: unit.id } });
       if (existing) redirect(`/demo/${sessionId}/customer/products/${unit.id}?notice=already-registered`);
     }
     throw error;
