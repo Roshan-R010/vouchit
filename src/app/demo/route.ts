@@ -9,7 +9,8 @@ export async function GET(request: Request) {
   const existing = saved && isUuid(saved) ? await db.demoSession.findUnique({ where: { id: saved }, select: { id: true } }) : null;
   const sessionId = existing?.id ?? await createDemoSession();
   const view = new URL(request.url).searchParams.get("view") === "brand" ? "brand" : "customer";
-  const response = NextResponse.redirect(new URL(`/demo/${sessionId}/${view}`, request.url));
+  const brand = await db.brand.findFirst({ where: { demoSessionId: sessionId }, select: { id: true } });
+  const response = NextResponse.redirect(new URL(`/demo/${sessionId}/${brand ? view : "setup"}`, request.url));
   response.cookies.set("vouch-demo-session", sessionId, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30, secure: new URL(request.url).protocol === "https:" });
   return response;
 }

@@ -1,13 +1,9 @@
-import { createDemoSession } from "../src/lib/demo-fixtures";
+import { createDemoSession } from "../src/lib/demo-session";
 import { db } from "../src/lib/db";
 
 async function seed() {
   const existing = await db.demoSession.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
   const id = existing?.id ?? await createDemoSession();
-  await db.$transaction([
-    db.productModel.updateMany({ where: { slug: "kestrel-pro", imageUrl: null, brand: { slug: "kestrel-audio" } }, data: { imageUrl: "/images/kestrel-pro-headphones.png" } }),
-    db.productModel.updateMany({ where: { slug: "kestrel-charge-20k", imageUrl: null, brand: { slug: "kestrel-audio" } }, data: { imageUrl: "/images/kestrel-charge-powerbank.png" } }),
-  ]);
   return id;
 }
 

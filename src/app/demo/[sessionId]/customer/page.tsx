@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Box, Headphones, Plus } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CustomerNav } from "@/components/customer-nav";
 import { db } from "@/lib/db";
 import { daysRemaining, isCoverageActive } from "@/lib/dates";
@@ -27,26 +27,18 @@ export default async function CustomerDashboard({ params, searchParams }: Props)
   if (!isUuid(sessionId)) notFound();
   const query = await searchParams;
   const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId } });
-  if (!customer) {
-    return (
-      <main className="page-wrap">
-        <div className="blank-state" style={{ marginTop: 60 }}>
-          This demo session was not found. <Link href="/demo">Start a new demo →</Link>
-        </div>
-      </main>
-    );
-  }
+  if (!await db.demoSession.findUnique({ where: { id: sessionId }, select: { id: true } })) redirect("/demo");
 
-  const registrations = await db.warrantyRegistration.findMany({
+  const registrations = customer ? await db.warrantyRegistration.findMany({
     where: { customerId: customer.id, unit: { brand: { demoSessionId: sessionId } } },
     include: {
       unit: { include: { productModel: true, purchaseOrder: true, brand: true } },
       claim: true,
     },
     orderBy: { registeredAt: "desc" },
-  });
+  }) : [];
 
-  const brand = registrations[0]?.unit.brand || { name: "Kestrel Audio" };
+  const brand = registrations[0]?.unit.brand || await db.brand.findFirst({ where: { demoSessionId: sessionId } }) || { name: "Your brand", logoUrl: null };
 
   const claims = registrations
     .flatMap((registration) =>
@@ -87,7 +79,7 @@ export default async function CustomerDashboard({ params, searchParams }: Props)
 
   return (
     <>
-      <CustomerNav sessionId={sessionId} customerName={customer.name} brandName={brand.name} />
+      <CustomerNav sessionId={sessionId} customerName={customer?.name || "Customer"} brandName={brand.name} brandLogo={brand.logoUrl} />
       <main className="page-wrap content" style={{ paddingTop: 32 }}>
         {/* Header Section */}
         <div

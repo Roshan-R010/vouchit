@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Inbox, Package, Users, ClipboardList, BarChart2, Settings, ArrowUpRight, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 
-export function BrandNav({ sessionId, brandName }: { sessionId: string; brandName: string }) {
+export function BrandNav({ sessionId, brandName, logoUrl }: { sessionId: string; brandName: string; logoUrl?: string | null }) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
   const base = `/demo/${sessionId}/brand`;
@@ -19,7 +19,7 @@ export function BrandNav({ sessionId, brandName }: { sessionId: string; brandNam
   ];
   return <aside className="business-sidebar">
     <Link href={base} className="business-logo"><span>v</span>vouch<span className="business-logo-label">Business</span></Link>
-    <div className="business-workspace"><span className="business-workspace-avatar">{brandName.slice(0, 1)}</span><div><strong>{brandName}</strong><small>Demo workspace</small></div></div>
+    <div className="business-workspace"><span className="business-workspace-avatar">{logoUrl ? <img src={logoUrl} alt={`${brandName} logo`}/> : brandName.slice(0, 1)}</span><div><strong>{brandName}</strong><small>Demo workspace</small></div></div>
     <div className="business-nav-caption">Workspace</div>
     <nav className="business-nav" aria-label="Business navigation">{links.map(({ title, href, icon: Icon }) => {
       const active = title === "Dashboard" ? pathname === href : pathname.startsWith(href);
@@ -28,6 +28,6 @@ export function BrandNav({ sessionId, brandName }: { sessionId: string; brandNam
         <Icon size={17} /><span>{title}</span>
       </Link>;
     })}</nav>
-    <div className="business-sidebar-bottom"><Link className={`business-nav-link ${pathname.endsWith("/settings") ? "active" : ""}`} href={`${base}/settings`}><Settings size={17}/>Settings</Link><Link className="business-nav-link" href={`/demo/${sessionId}/customer`}><ArrowUpRight size={17}/>Customer view</Link><form action={`/demo/${sessionId}/reset`} method="post" onSubmit={(event) => { if (!window.confirm("Reset this demo? Products, units, registrations and claims in this session will be replaced with the sample data.")) event.preventDefault(); }}><button type="submit" className="business-nav-link"><RotateCcw size={16}/>Reset demo</button></form><p>Fictional records · No sign-in</p></div>
+    <div className="business-sidebar-bottom"><Link className={`business-nav-link ${pathname.endsWith("/settings") ? "active" : ""}`} href={`${base}/settings`}><Settings size={17}/>Settings</Link><Link className="business-nav-link" href={`/demo/${sessionId}/customer`}><ArrowUpRight size={17}/>Customer view</Link><form action={`/demo/${sessionId}/reset`} method="post" onSubmit={(event) => { if (!window.confirm("Reset this demo? Products, units, registrations and claims in this session will be cleared so you can create a new brand.")) event.preventDefault(); }}><button type="submit" className="business-nav-link"><RotateCcw size={16}/>Reset demo</button></form><p>Fictional records · No sign-in</p></div>
   </aside>;
 }

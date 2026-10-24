@@ -3,6 +3,7 @@
 import { ActorRole, ClaimStatus, NotificationType, Prisma } from "@prisma/client";
 import { addCalendarMonths, dateOnly, isCoverageActive } from "@/lib/dates";
 import { db } from "@/lib/db";
+import { removeWorkspaceImage, saveWorkspaceImage, validateWorkspaceImage } from "@/lib/workspace-images";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -26,28 +27,31 @@ export async function registerWarrantyAction(formData: FormData) {
     where: { serialNumber, brand: { slug: brandSlug, demoSessionId: sessionId }, productModel: { slug: productSlug } },
     include: { productModel: true, purchaseOrder: true, registration: true },
   });
-  if (!customer || !unit) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-found`);
-  if (unit.productModel.brandId !== unit.brandId || unit.purchaseOrder.brandId !== unit.brandId || (unit.purchaseOrder.customerId && unit.purchaseOrder.customerId !== customer.id)) fail("not-found");
+  if (!unit) return fail("not-found");
+  if (unit.productModel.brandId !== unit.brandId || unit.purchaseOrder.brandId !== unit.brandId || (unit.purchaseOrder.customerId && unit.purchaseOrder.customerId !== customer?.id)) fail("not-found");
   if (unit.registration) {
-    if (unit.registration.customerId !== customer.id) fail("not-found");
+    if (unit.registration.customerId !== customer?.id) fail("not-found");
     redirect(`/demo/${sessionId}/customer/products/${unit.id}?notice=already-registered`);
   }
   const deliveredOn = unit.purchaseOrder.deliveredOn;
-  if (!deliveredOn || dateOnly(deliveredOn).getTime() > dateOnly(new Date()).getTime()) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-delivered`);
+  if (!deliveredOn || dateOnly(deliveredOn).getTime() > dateOnly(new Date()).getTime()) return fail("not-delivered");
   const start = dateOnly(deliveredOn);
   const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
   try {
     await db.$transaction(async (tx) => {
-      const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, customerId: customer.id, coverageStartsOn: start, coverageEndsOn: end } });
+      await tx.demoSession.update({ where: { id: sessionId }, data: { id: sessionId } });
+      let owner = await tx.customer.findFirst({ where: { demoSessionId: sessionId } });
+      if (!owner) owner = await tx.customer.create({ data: { demoSessionId: sessionId, name: customerName, email } });
+      else await tx.customer.update({ where: { id: owner.id }, data: { name: customerName, email } });
+      const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, customerId: owner.id, coverageStartsOn: start, coverageEndsOn: end } });
       await tx.demoNotification.create({ data: {
         demoSessionId: sessionId, type: NotificationType.WARRANTY_REGISTERED, recipientLabel: "Customer",
         subject: "Your warranty is registered", previewBody: `${unit.productModel.name} (${serialNumber}) is covered from ${start.toISOString().slice(0, 10)} through ${end.toISOString().slice(0, 10)}. Preview — not sent.`, relatedId: registration.id,
       } });
-      await tx.customer.update({ where: { id: customer.id }, data: { name: customerName, email } });
-    });
+    }, { timeout: 15000 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const existing = await db.warrantyRegistration.findFirst({ where: { unitId: unit.id, customerId: customer.id } });
+      const existing = await db.warrantyRegistration.findFirst({ where: { unitId: unit.id, customer: { demoSessionId: sessionId } } });
       if (existing) redirect(`/demo/${sessionId}/customer/products/${unit.id}?notice=already-registered`);
     }
     throw error;
@@ -56,40 +60,47 @@ export async function registerWarrantyAction(formData: FormData) {
   redirect(`/demo/${sessionId}/customer/products/${unit.id}?notice=registered`);
 }
 
-export async function submitClaimAction(formData: FormData) {
+export type ClaimActionState = { error?: string };
+
+export async function submitClaimAction(_state: ClaimActionState, formData: FormData): Promise<ClaimActionState> {
   const sessionId = text(formData, "sessionId");
   const unitId = text(formData, "unitId");
   if (!uuid.test(sessionId) || !uuid.test(unitId)) redirect("/");
   const issueTitle = text(formData, "issueTitle");
   const description = text(formData, "description");
   const submissionId = text(formData, "submissionId");
-  const claimPath = `/demo/${sessionId}/customer/claims/new?unitId=${unitId}`;
-  if (!uuid.test(submissionId) || !issueTitle || issueTitle.length > 120 || !description || description.length > 3000) redirect(`${claimPath}&error=missing`);
+  if (!uuid.test(submissionId) || !issueTitle || issueTitle.length > 120 || !description || description.length > 3000) return { error: "Enter an issue title and description." };
   const registration = await db.warrantyRegistration.findFirst({
     where: { unitId, customer: { demoSessionId: sessionId }, unit: { brand: { demoSessionId: sessionId } } },
-    include: { claim: { select: { id: true } }, unit: { include: { productModel: true, brand: true, purchaseOrder: true } }, customer: true },
+    include: { claim: { select: { id: true } }, unit: { include: { productModel: true, brand: true, purchaseOrder: true } } },
   });
-  if (!registration || registration.unit.productModel.brandId !== registration.unit.brandId || registration.unit.purchaseOrder.brandId !== registration.unit.brandId) redirect(`/demo/${sessionId}/customer?error=registration-required`);
+  if (!registration || registration.unit.productModel.brandId !== registration.unit.brandId || registration.unit.purchaseOrder.brandId !== registration.unit.brandId) return { error: "Register this product before raising a claim." };
   if (registration.claim) redirect(`/demo/${sessionId}/customer/claims/${registration.claim.id}`);
-  if (!isCoverageActive(registration.coverageEndsOn) || dateOnly(registration.coverageStartsOn).getTime() > dateOnly(new Date()).getTime()) redirect(`${claimPath}&error=expired`);
+  if (!isCoverageActive(registration.coverageEndsOn) || dateOnly(registration.coverageStartsOn).getTime() > dateOnly(new Date()).getTime()) return { error: "This product is outside its warranty coverage." };
+  const photos = formData.getAll("photos").filter((file): file is File => file instanceof File && file.size > 0);
+  if (photos.length > 3) return { error: "Attach up to three photos." };
   const reference = `VCH-${submissionId.replaceAll("-", "").toUpperCase()}`;
+  const uploaded: string[] = [];
   let claim: { id: string };
   try {
+    photos.forEach(validateWorkspaceImage);
+    for (const photo of photos) uploaded.push(await saveWorkspaceImage(sessionId, "claims", submissionId, photo));
     claim = await db.$transaction(async (tx) => {
-    const created = await tx.warrantyClaim.create({ data: { id: submissionId, registrationId: registration.id, reference, issueTitle, description, status: ClaimStatus.SUBMITTED } });
-    await tx.claimEvent.create({ data: { claimId: created.id, actor: ActorRole.CUSTOMER, toStatus: ClaimStatus.SUBMITTED, note: "Claim submitted" } });
-    await tx.demoNotification.createMany({ data: [
-      { demoSessionId: sessionId, type: NotificationType.CLAIM_SUBMITTED_CUSTOMER, recipientLabel: "Customer", subject: "We received your warranty claim", previewBody: `${reference} was submitted. Track it at /demo/${sessionId}/customer/claims/${created.id}. Preview — not sent.`, relatedId: created.id },
-      { demoSessionId: sessionId, type: NotificationType.CLAIM_SUBMITTED_BRAND, recipientLabel: registration.unit.brand.name, subject: "New warranty claim", previewBody: `${reference} was submitted. Open /demo/${sessionId}/brand/claims/${created.id} to review. Preview — not sent.`, relatedId: created.id },
-    ] });
-    return created;
-  });
+      const created = await tx.warrantyClaim.create({ data: { id: submissionId, registrationId: registration.id, reference, issueTitle, description, status: ClaimStatus.SUBMITTED, attachments: { create: uploaded.map((fileKey) => ({ fileKey })) } } });
+      await tx.claimEvent.create({ data: { claimId: created.id, actor: ActorRole.CUSTOMER, toStatus: ClaimStatus.SUBMITTED, note: "Claim submitted" } });
+      await tx.demoNotification.createMany({ data: [
+        { demoSessionId: sessionId, type: NotificationType.CLAIM_SUBMITTED_CUSTOMER, recipientLabel: "Customer", subject: "We received your warranty claim", previewBody: `${reference} was submitted. Preview — not sent.`, relatedId: created.id },
+        { demoSessionId: sessionId, type: NotificationType.CLAIM_SUBMITTED_BRAND, recipientLabel: registration.unit.brand.name, subject: "New warranty claim", previewBody: `${reference} was submitted. Preview — not sent.`, relatedId: created.id },
+      ] });
+      return created;
+    }, { timeout: 15000 });
   } catch (error) {
+    await Promise.all(uploaded.map(removeWorkspaceImage));
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const existing = await db.warrantyClaim.findFirst({ where: { registrationId: registration.id }, select: { id: true } });
       if (existing) redirect(`/demo/${sessionId}/customer/claims/${existing.id}`);
     }
-    throw error;
+    return { error: error instanceof Error && !error.message.includes("prisma") ? error.message : "The claim could not be saved. Please try again." };
   }
   revalidatePath(`/demo/${sessionId}`, "layout");
   redirect(`/demo/${sessionId}/customer/claims/${claim.id}`);
