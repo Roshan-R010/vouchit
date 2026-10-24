@@ -1,0 +1,29 @@
+.catalog{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:24px 0}
+.catalogCard{background:#fff;border:1px solid #e8e6e0;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:13px}
+.catalogCard>div:first-child{height:190px}
+.catalogCard h2{font-size:18px;letter-spacing:-.4px;margin:0}
+.catalogCard p{font-size:12px;color:#747871;margin:0}
+.catalogCard a{align-self:flex-start;margin-top:auto}
+.productHeading{display:grid;grid-template-columns:150px 1fr;gap:22px;align-items:center;margin:25px 0 0}
+.productHeading h2{font-size:20px;margin:0 0 8px;letter-spacing:-.5px}
+.productHeading p{line-height:1.6}
+.detail{display:grid;grid-template-columns:240px 1fr;gap:28px;padding:30px}
+.detailImage>div{height:255px}
+.detail h2{font-size:23px;margin:0 0 8px}
+.detailText{font-size:13px;color:#73776e;margin:0 0 20px}
+.facts{display:grid;gap:12px;padding:22px 0}
+.fact{display:flex;justify-content:space-between;gap:20px;font-size:12px}
+.fact dt{color:#777}
+.fact dd{font-weight:600;margin:0;text-align:right;overflow-wrap:anywhere}
+.messageBlock{border-top:1px solid #eee9e2;margin:22px 0 0;padding:20px 0 0}
+.messageBlock h3{font-size:14px;margin:0 0 12px}
+.compactImage{width:95px;flex-shrink:0}
+.claimReference{overflow-wrap:anywhere;font-size:clamp(16px,2vw,25px)!important}
+.helpText{font-size:12px;color:#777;line-height:1.6}
+.claimList{display:grid;gap:12px;margin:25px 0}
+.claimItem{display:flex;gap:15px;padding:18px;border:1px solid #e8e6e0;border-radius:12px;background:white;align-items:center}
+.claimItem h2{font-size:14px;margin:0 0 5px;overflow-wrap:anywhere}
+.claimItem p{font-size:12px;color:#777;margin:0 0 7px}
+.claimItem>div:nth-child(2){flex:1;min-width:0}
+@media(max-width:900px){.catalog{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.catalog{grid-template-columns:1fr}.productHeading{grid-template-columns:90px 1fr;gap:14px}.productHeading h2{font-size:17px}.detail{grid-template-columns:1fr;padding:22px}.detailImage{max-width:300px;margin:auto;width:100%}.claimItem{flex-wrap:wrap}.compactImage{width:70px}}

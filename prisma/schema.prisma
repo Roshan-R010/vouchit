@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  INFO_REQUESTED
+  APPROVED
+  REJECTED
+  RESOLVED
+}
+
+enum ActorRole {
+  CUSTOMER
+  BRAND
+  SYSTEM
+}
+
+enum ResolutionMethod {
+  REPAIR
+  REPLACEMENT
+}
+
+enum NotificationType {
+  WARRANTY_REGISTERED
+  CLAIM_SUBMITTED_CUSTOMER
+  CLAIM_SUBMITTED_BRAND
+}
+
+model DemoSession {
+  id            String             @id @default(uuid()) @db.Uuid
+  createdAt     DateTime           @default(now())
+  expiresAt     DateTime?
+  brands        Brand[]
+  customers     Customer[]
+  notifications DemoNotification[]
+}
+
+model Brand {
+  id            String         @id @default(uuid()) @db.Uuid
+  demoSessionId String         @db.Uuid
+  name          String
+  slug          String
+  supportEmail  String?
+  demoSession   DemoSession    @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
+  products      ProductModel[]
+  orders        PurchaseOrder[]
+  units         ProductUnit[]
+  @@unique([demoSessionId, slug])
+}
+
+model ProductModel {
+  id             String       @id @default(uuid()) @db.Uuid
+  brandId        String       @db.Uuid
+  name           String
+  slug           String
+  sku            String?
+  imageUrl       String?
+  warrantyMonths Int          @default(36)
+  brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  units          ProductUnit[]
+  @@unique([brandId, slug])
+}
+
+model Customer {
+  id            String                @id @default(uuid()) @db.Uuid
+  demoSessionId String                @db.Uuid
+  name          String
+  email         String
+  demoSession   DemoSession           @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
+  orders        PurchaseOrder[]
+  registrations WarrantyRegistration[]
+  @@unique([demoSessionId, email])
+}
+
+model PurchaseOrder {
+  id          String       @id @default(uuid()) @db.Uuid
+  brandId     String       @db.Uuid
+  customerId  String?      @db.Uuid
+  orderNumber String
+  orderedOn   DateTime?    @db.Date
+  deliveredOn DateTime?    @db.Date
+  brand       Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  units       ProductUnit[]
+  @@unique([brandId, orderNumber])
+}
+
+model ProductUnit {
+  id             String               @id @default(uuid()) @db.Uuid
+  brandId        String               @db.Uuid
+  productModelId String               @db.Uuid
+  purchaseOrderId String              @db.Uuid
+  serialNumber   String
+  createdAt      DateTime             @default(now())
+  brand          Brand                @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  productModel   ProductModel         @relation(fields: [productModelId], references: [id], onDelete: Cascade)
+  purchaseOrder  PurchaseOrder        @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  registration   WarrantyRegistration?
+  @@unique([brandId, serialNumber])
+}
+
+model WarrantyRegistration {
+  id               String         @id @default(uuid()) @db.Uuid
+  unitId           String         @unique @db.Uuid
+  customerId       String         @db.Uuid
+  registeredAt     DateTime       @default(now())
+  coverageStartsOn DateTime       @db.Date
+  coverageEndsOn   DateTime       @db.Date
+  unit             ProductUnit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  customer         Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  claim            WarrantyClaim?
+}
+
+model WarrantyClaim {
+  id             String              @id @default(uuid()) @db.Uuid
+  registrationId String              @unique @db.Uuid
+  reference      String              @unique
+  issueTitle     String
+  description    String
+  status         ClaimStatus         @default(SUBMITTED)
+  submittedAt    DateTime            @default(now())
+  resolutionMethod ResolutionMethod?
+  registration   WarrantyRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  attachments    ClaimAttachment[]
+  messages       ClaimMessage[]
+  events         ClaimEvent[]
+  @@index([status])
+  @@index([submittedAt])
+}
+
+model ClaimAttachment {
+  id        String       @id @default(uuid()) @db.Uuid
+  claimId   String       @db.Uuid
+  fileKey   String
+  createdAt DateTime     @default(now())
+  claim     WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+}
+
+model ClaimMessage {
+  id        String       @id @default(uuid()) @db.Uuid
+  claimId   String       @db.Uuid
+  author    ActorRole
+  body      String
+  createdAt DateTime     @default(now())
+  claim     WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+}
+
+model ClaimEvent {
+  id        String       @id @default(uuid()) @db.Uuid
+  claimId   String       @db.Uuid
+  actor     ActorRole
+  fromStatus ClaimStatus?
+  toStatus  ClaimStatus
+  note      String?
+  createdAt DateTime     @default(now())
+  claim     WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+}
+
+model DemoNotification {
+  id             String           @id @default(uuid()) @db.Uuid
+  demoSessionId  String           @db.Uuid
+  type           NotificationType
+  recipientLabel String
+  subject        String
+  previewBody    String
+  relatedId      String?          @db.Uuid
+  createdAt      DateTime         @default(now())
+  demoSession    DemoSession      @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
+}
