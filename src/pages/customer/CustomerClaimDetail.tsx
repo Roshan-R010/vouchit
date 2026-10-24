@@ -1,3 +1,5 @@
+import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle } from "lucide-react";
@@ -14,7 +16,7 @@ export function CustomerClaimDetail() {
   const loadClaim = () => {
     if (!sessionId || !claimId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/customer/claims/${claimId}`)
+    apiFetch(`/api/demo/${sessionId}/customer/claims/${claimId}`)
       .then((res) => res.json())
       .then((data) => {
         setClaim(data.claim);
@@ -37,7 +39,7 @@ export function CustomerClaimDetail() {
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/demo/${sessionId}/customer/claims/${claimId}/reply`, {
+      const response = await apiFetch(`/api/demo/${sessionId}/customer/claims/${claimId}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: replyMessage.trim() }),
@@ -96,9 +98,7 @@ export function CustomerClaimDetail() {
           </p>
         </div>
         <div>
-          <span className={`status-pill ${status.toLowerCase().replace("_", "-")}`}>
-            {status.replace("_", " ")}
-          </span>
+          <ClaimStatusBadge status={status}/>
         </div>
       </div>
 
@@ -118,7 +118,7 @@ export function CustomerClaimDetail() {
         </div>
         <div className={`timeline-step ${isComplete ? "complete" : ""}`}>
           <div className="timeline-marker" />
-          <span>Resolved</span>
+          <span>{status === "REJECTED" ? "Closed" : "Resolved"}</span>
         </div>
       </div>
 
@@ -128,12 +128,12 @@ export function CustomerClaimDetail() {
       {status === "INFO_REQUESTED" && (
         <div style={{ margin: "0 30px 24px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "10px", padding: "18px" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: "14px", color: "#9a3412" }}>Additional Information Needed</h3>
-          <p style={{ margin: "0 0 14px", fontSize: "13px", color: "#7c2d12" }}>
+          <p style={{ margin: "0 0 14px", fontSize: "15px", color: "#7c2d12" }}>
             The brand specialist asked for more details to continue evaluating this warranty claim:
           </p>
 
           {claim.messages?.length > 0 && (
-            <div style={{ background: "#fff", padding: "12px 14px", borderRadius: "6px", marginBottom: "14px", fontSize: "13px", color: "#333", border: "1px solid #ffedd5" }}>
+            <div style={{ background: "#fff", padding: "12px 14px", borderRadius: "6px", marginBottom: "14px", fontSize: "15px", color: "#333", border: "1px solid #ffedd5" }}>
               "{claim.messages[claim.messages.length - 1].body}"
             </div>
           )}
@@ -145,7 +145,7 @@ export function CustomerClaimDetail() {
               onChange={(e) => setReplyMessage(e.target.value)}
               rows={3}
               required
-              style={{ width: "100%", padding: "10px", border: "1px solid #fed7aa", borderRadius: "6px", fontSize: "13px" }}
+              style={{ width: "100%", padding: "10px", border: "1px solid #fed7aa", borderRadius: "6px", fontSize: "15px" }}
             />
             <button type="submit" disabled={submittingReply} className="action" style={{ marginTop: "10px" }}>
               {submittingReply ? "Sending..." : "Submit Response"}
@@ -177,15 +177,15 @@ export function CustomerClaimDetail() {
 
       {/* Activity Log */}
       <div style={{ padding: "0 30px 30px" }}>
-        <h3 style={{ fontSize: "13px", marginBottom: "14px" }}>Claim Timeline & Event Log</h3>
+        <h3 style={{ fontSize: "15px", marginBottom: "14px" }}>Claim Timeline & Event Log</h3>
         <div style={{ display: "grid", gap: "12px" }}>
           {claim.events?.map((ev: any, idx: number) => (
             <div key={ev.id || idx} className="message" style={{ margin: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
                 <strong>{ev.actor === "BRAND" ? "Brand Support" : customer.name}</strong>
-                <span style={{ fontSize: "11px", color: "#888" }}>{formatDate(ev.createdAt)}</span>
+                <span style={{ fontSize: "14px", color: "#888" }}>{formatDate(ev.createdAt)}</span>
               </div>
-              <div style={{ fontSize: "12px" }}>{ev.note || `Status changed to ${ev.toStatus}`}</div>
+              <div style={{ fontSize: "14px" }}>{ev.note || `Status changed to ${ev.toStatus}`}</div>
             </div>
           ))}
         </div>

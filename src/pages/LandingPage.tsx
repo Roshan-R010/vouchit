@@ -51,23 +51,23 @@ export function LandingPage() {
           <br />
           feel <em>thought through.</em>
         </h2>
-        <p>Try the connected customer and brand experience with fictional demo records.</p>
+        <p>Your products, warranties and aftercare, together.</p>
         <div className="bottom-cta-actions">
           <Link className="hero-primary" to="/demo">
-            Launch interactive demo <ArrowRight size={16} />
+            Open customer portal <ArrowRight size={16} />
           </Link>
           <Link className="bottom-cta-link" to="/demo?view=brand">
             Explore the brand side <ArrowUpRight size={15} />
           </Link>
         </div>
-        <small>Fictional records for product demonstration only. No emails are sent.</small>
+        <small>Keep every product and warranty in one place.</small>
       </section>
       <footer className="landing-footer">
         <Link className="landing-logo" to="/">
           <span>V</span>vouch
         </Link>
         <span>Product care, made clear.</span>
-        <span>© Vouch demo</span>
+        <span>© Vouch</span>
       </footer>
     </main>
   );

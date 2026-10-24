@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/api-fetch";
+import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Plus, Package, Copy, Check, ExternalLink } from "lucide-react";
@@ -12,7 +14,7 @@ export function BrandProducts() {
   useEffect(() => {
     if (!sessionId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/brand/products`)
+    apiFetch(`/api/demo/${sessionId}/brand/products`)
       .then((res) => res.json())
       .then((data) => {
         setProducts(data.products || []);
@@ -61,13 +63,13 @@ export function BrandProducts() {
         {products.map((p) => {
           const registeredCount = p.units?.filter((u: any) => u.registration).length || 0;
           const totalUnits = p.units?.length || 0;
-          const regLink = `/demo/${sessionId}/register/${brand?.slug || "kestrel"}/${p.slug}`;
+          const regLink = `/demo/${sessionId}/register/${brand?.slug || ""}/${p.slug}`;
 
           return (
             <div key={p.id} className="business-product-card">
               <div className="business-product-image">
                 {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} />
+                  <ProductPhoto src={p.imageUrl} alt={p.name} />
                 ) : (
                   <Package size={44} strokeWidth={1.5} />
                 )}

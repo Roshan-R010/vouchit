@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -14,14 +15,14 @@ export function DemoLauncher() {
         const view = searchParams.get("view") === "brand" ? "brand" : "customer";
         const savedSession = localStorage.getItem("vouch-demo-session");
 
-        const response = await fetch("/api/demo/session", {
+        const response = await apiFetch("/api/demo/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: savedSession || undefined }),
         });
 
         if (!response.ok) {
-          throw new Error("Could not initialize demo session");
+          throw new Error("Could not initialize workspace");
         }
 
         const data = await response.json();
@@ -31,7 +32,7 @@ export function DemoLauncher() {
         }
       } catch (err: any) {
         if (active) {
-          setError(err.message || "Failed to start demo session");
+          setError(err.message || "Failed to start workspace");
         }
       }
     }
@@ -55,7 +56,7 @@ export function DemoLauncher() {
               window.location.reload();
             }}
           >
-            Retry Launching Demo
+            Retry
           </button>
         </div>
       </main>
@@ -76,8 +77,8 @@ export function DemoLauncher() {
             margin: "0 auto 16px",
           }}
         />
-        <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#222", margin: "0 0 6px" }}>Launching Vouch Demo</h2>
-        <p style={{ fontSize: "13px", color: "#777", margin: 0 }}>Preparing live demo records...</p>
+        <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#222", margin: "0 0 6px" }}>Opening Vouch</h2>
+        <p style={{ fontSize: "15px", color: "#777", margin: 0 }}>Opening your workspace...</p>
       </div>
     </div>
   );

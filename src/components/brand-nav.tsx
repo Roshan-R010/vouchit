@@ -1,3 +1,5 @@
+import { VouchLogo } from "@/components/vouch-logo";
+import { prefetchApi } from "@/lib/api-fetch";
 "use client";
 
 import Link from "next/link";
@@ -18,16 +20,16 @@ export function BrandNav({ sessionId, brandName, logoUrl }: { sessionId: string;
     { title: "Analytics", href: `${base}/analytics`, icon: BarChart2 },
   ];
   return <aside className="business-sidebar">
-    <Link href={base} className="business-logo"><span>v</span>vouch<span className="business-logo-label">Business</span></Link>
-    <div className="business-workspace"><span className="business-workspace-avatar">{logoUrl ? <img src={logoUrl} alt=""/> : brandName.slice(0, 1)}</span><div><strong>{brandName}</strong><small>Demo workspace</small></div></div>
+    <Link href={base} className="business-logo"><VouchLogo /></Link>
+    <div className="business-workspace"><span className="business-workspace-avatar">{logoUrl ? <img src={logoUrl} alt=""/> : brandName.slice(0, 1)}</span><div><strong>{brandName}</strong><small>Brand workspace</small></div></div>
     <div className="business-nav-caption">Workspace</div>
     <nav className="business-nav" aria-label="Business navigation">{links.map(({ title, href, icon: Icon }) => {
       const active = title === "Dashboard" ? pathname === href : pathname.startsWith(href);
-      return <Link key={href} href={href} className={`business-nav-link ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}>
+      return <Link key={href} href={href} onPointerEnter={() => prefetchApi(`/api${href}`)} onFocus={() => prefetchApi(`/api${href}`)} className={`business-nav-link ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}>
         {active && <motion.span className="business-nav-active" layoutId="business-nav-highlight" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 440, damping: 36 }} />}
         <Icon size={17} /><span>{title}</span>
       </Link>;
     })}</nav>
-    <div className="business-sidebar-bottom"><Link className={`business-nav-link ${pathname.endsWith("/settings") ? "active" : ""}`} href={`${base}/settings`}><Settings size={17}/>Settings</Link><Link className="business-nav-link" href={`/demo/${sessionId}/customer`}><ArrowUpRight size={17}/>Customer view</Link><form action={`/demo/${sessionId}/reset`} method="post" onSubmit={(event) => { if (!window.confirm("Clear this workspace? This permanently removes the brand, products, units, registrations and claims.")) event.preventDefault(); }}><button type="submit" className="business-nav-link"><RotateCcw size={16}/>Clear workspace</button></form><p>Fictional records · No sign-in</p></div>
+    <div className="business-sidebar-bottom"><Link className={`business-nav-link ${pathname.endsWith("/settings") ? "active" : ""}`} href={`${base}/settings`}><Settings size={17}/>Settings</Link><Link className="business-nav-link" href={`/demo/${sessionId}/customer`}><ArrowUpRight size={17}/>Customer view</Link><form action={`/demo/${sessionId}/reset`} method="post" onSubmit={(event) => { if (!window.confirm("Clear this workspace? This permanently removes the brand, products, units, registrations and claims.")) event.preventDefault(); }}><button type="submit" className="business-nav-link"><RotateCcw size={16}/>Clear workspace</button></form></div>
   </aside>;
 }

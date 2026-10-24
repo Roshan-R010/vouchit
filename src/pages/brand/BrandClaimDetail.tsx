@@ -1,3 +1,5 @@
+import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar } from "lucide-react";
@@ -36,7 +38,7 @@ export function BrandClaimDetail() {
   const loadClaim = () => {
     if (!sessionId || !claimId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/brand/claims/${claimId}`)
+    apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.claim) {
@@ -66,7 +68,7 @@ export function BrandClaimDetail() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/demo/${sessionId}/brand/claims/${claimId}/action`, {
+      const response = await apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -136,9 +138,7 @@ export function BrandClaimDetail() {
             <span className="business-eyebrow" style={{ margin: 0 }}>
               CLAIM {claim.reference}
             </span>
-            <span className="business-badge" style={claimBadgeStyle(status)}>
-              {claimStatusLabel[status] || status}
-            </span>
+            <ClaimStatusBadge status={status}/>
           </div>
           <h1>{claim.issueTitle}</h1>
           <p>
@@ -158,7 +158,7 @@ export function BrandClaimDetail() {
             <div className="business-panel-header">
               <h2>Customer Statement</h2>
             </div>
-            <div style={{ padding: "20px 22px", fontSize: "13px", lineHeight: "1.7", color: "#373e35" }}>
+            <div style={{ padding: "20px 22px", fontSize: "15px", lineHeight: "1.7", color: "#373e35" }}>
               <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{claim.description}</p>
             </div>
           </div>
@@ -169,34 +169,34 @@ export function BrandClaimDetail() {
               <h2>Product & Delivery Record</h2>
             </div>
             <div style={{ padding: "18px 22px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "14px" }}>
                 <div>
-                  <div style={{ color: "#8a9184", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Model</div>
-                  <strong style={{ fontSize: "13px", color: "#242a25" }}>{unit.productModel.name}</strong>
+                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Model</div>
+                  <strong style={{ fontSize: "15px", color: "#242a25" }}>{unit.productModel.name}</strong>
                   <div style={{ color: "#7a8276", marginTop: "2px" }}>SKU: {unit.productModel.sku || "N/A"}</div>
                 </div>
 
                 <div>
-                  <div style={{ color: "#8a9184", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Stamped Unit ID</div>
-                  <strong className="business-mono" style={{ fontSize: "13px", color: "#242a25" }}>
+                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Stamped Unit ID</div>
+                  <strong className="business-mono" style={{ fontSize: "15px", color: "#242a25" }}>
                     {unit.serialNumber}
                   </strong>
                 </div>
 
                 <div>
-                  <div style={{ color: "#8a9184", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Purchase Order</div>
-                  <div className="business-mono" style={{ fontSize: "12px", color: "#242a25", fontWeight: 600 }}>
+                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Purchase Order</div>
+                  <div className="business-mono" style={{ fontSize: "14px", color: "#242a25", fontWeight: 600 }}>
                     {unit.purchaseOrder.orderNumber}
                   </div>
-                  <div style={{ color: "#7a8276", fontSize: "11px" }}>
+                  <div style={{ color: "#7a8276", fontSize: "14px" }}>
                     Delivered: {unit.purchaseOrder.deliveredOn ? formatDate(unit.purchaseOrder.deliveredOn) : "N/A"}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ color: "#8a9184", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Warranty Duration</div>
-                  <div style={{ fontSize: "12px", color: "#242a25", fontWeight: 600 }}>{unit.productModel.warrantyMonths} Months Coverage</div>
-                  <div style={{ color: "#7a8276", fontSize: "11px" }}>Through: {formatDate(claim.registration.coverageEndsOn)}</div>
+                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Warranty Duration</div>
+                  <div style={{ fontSize: "14px", color: "#242a25", fontWeight: 600 }}>{unit.productModel.warrantyMonths} Months Coverage</div>
+                  <div style={{ color: "#7a8276", fontSize: "14px" }}>Through: {formatDate(claim.registration.coverageEndsOn)}</div>
                 </div>
               </div>
             </div>
@@ -222,11 +222,11 @@ export function BrandClaimDetail() {
                       }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
                         <strong>{ev.actor === "CUSTOMER" ? customer.name : "Brand Specialist"}</strong>
                         <span style={{ color: "#9aa196" }}>{formatDate(ev.createdAt)}</span>
                       </div>
-                      <div style={{ fontSize: "12px", color: "#4f574c", marginTop: "3px" }}>
+                      <div style={{ fontSize: "14px", color: "#4f574c", marginTop: "3px" }}>
                         {ev.note || `Transitioned to ${ev.toStatus}`}
                       </div>
                     </div>
@@ -241,37 +241,35 @@ export function BrandClaimDetail() {
         <div>
           <div className="business-panel">
             <div className="business-panel-header">
-              <h2>Claim Decision</h2>
-              <span className="business-badge" style={claimBadgeStyle(status)}>
-                {claimStatusLabel[status]}
-              </span>
+              <h2>Review & decision</h2>
+              <ClaimStatusBadge status={status}/>
             </div>
 
             <div style={{ padding: "20px 22px" }}>
               {status === "RESOLVED" && (
                 <div style={{ textAlign: "center", padding: "16px 0", color: "#4e8050" }}>
-                  <CheckCircle size={36} style={{ margin: "0 auto 10px" }} />
-                  <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Claim Resolved</h3>
-                  <p style={{ fontSize: "12px", color: "#6a7b68", margin: 0 }}>
-                    Method: {claim.resolutionMethod || "REPLACEMENT"}. This claim is finalized.
+
+                  <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Claim resolved</h3>
+                  <p style={{ fontSize: "14px", color: "#6a7b68", margin: 0 }}>
+                    Resolution: {claim.resolutionMethod === "REPAIR" ? "Repair" : claim.resolutionMethod === "REPLACEMENT" ? "Replacement" : "Not recorded"}.
                   </p>
                 </div>
               )}
 
               {status === "REJECTED" && (
                 <div style={{ textAlign: "center", padding: "16px 0", color: "#a5655d" }}>
-                  <XCircle size={36} style={{ margin: "0 auto 10px" }} />
-                  <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Claim Rejected</h3>
-                  <p style={{ fontSize: "12px", color: "#8a6660", margin: 0 }}>This warranty claim was rejected with reason noted.</p>
+
+                  <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Claim rejected</h3>
+                  <p style={{ fontSize: "14px", color: "#8a6660", margin: 0 }}>The decision and reason are recorded in the claim history.</p>
                 </div>
               )}
 
               {status === "INFO_REQUESTED" && (
                 <div style={{ textAlign: "center", padding: "16px 0", color: "#917036" }}>
-                  <HelpCircle size={36} style={{ margin: "0 auto 10px" }} />
-                  <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Awaiting Customer Response</h3>
-                  <p style={{ fontSize: "12px", color: "#887856", margin: 0 }}>
-                    Your request for information was sent. The claim will return to In Review once the customer responds.
+
+                  <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Awaiting customer response</h3>
+                  <p style={{ fontSize: "14px", color: "#887856", margin: 0 }}>
+                    The claim will return to review when the customer replies.
                   </p>
                 </div>
               )}
@@ -281,11 +279,11 @@ export function BrandClaimDetail() {
                 <form onSubmit={handleActionSubmit}>
                   {status === "SUBMITTED" && (
                     <div>
-                      <p style={{ fontSize: "12px", color: "#636d5e", lineHeight: 1.6, marginBottom: "16px" }}>
+                      <p style={{ fontSize: "14px", color: "#636d5e", lineHeight: 1.6, marginBottom: "16px" }}>
                         This is a new customer warranty claim. Begin review to evaluate issue details and evidence.
                       </p>
                       <button type="submit" disabled={submitting} className="business-button primary" style={{ width: "100%" }}>
-                        {submitting ? "Processing..." : "Start Review"}
+                        {submitting ? "Saving?" : "Start review"}
                       </button>
                     </div>
                   )}
@@ -299,15 +297,15 @@ export function BrandClaimDetail() {
                           onChange={(e) => setDecision(e.target.value)}
                           style={{
                             padding: "9px 12px",
-                            fontSize: "12px",
+                            fontSize: "14px",
                             border: "1px solid #dde3d6",
                             borderRadius: "6px",
                             outline: 0,
                           }}
                         >
-                          <option value="approve">Approve Claim</option>
-                          <option value="request_info">Request Information from Customer</option>
-                          <option value="reject">Reject Claim</option>
+                          <option value="approve">Approve claim</option>
+                          <option value="request_info">Request information</option>
+                          <option value="reject">Reject claim</option>
                         </select>
                       </div>
 
@@ -322,10 +320,10 @@ export function BrandClaimDetail() {
                         <textarea
                           placeholder={
                             decision === "request_info"
-                              ? "e.g. Could you describe whether the charging light turns on when plugged in?"
+                              ? "Tell the customer what information is needed to continue."
                               : decision === "reject"
-                              ? "e.g. Physical water damage is not covered under manufacturer warranty."
-                              : "e.g. Claim verified. Unit qualifies for replacement."
+                              ? "Explain why this claim is not covered and reference the relevant warranty terms."
+                              : "Add the review findings and next steps for the customer."
                           }
                           value={note}
                           onChange={(e) => setNote(e.target.value)}
@@ -346,17 +344,17 @@ export function BrandClaimDetail() {
                         {submitting
                           ? "Saving..."
                           : decision === "approve"
-                          ? "Approve Claim"
+                          ? "Approve claim"
                           : decision === "request_info"
-                          ? "Send Question to Customer"
-                          : "Reject Claim"}
+                          ? "Request information"
+                          : "Reject claim"}
                       </button>
                     </div>
                   )}
 
                   {status === "APPROVED" && (
                     <div>
-                      <p style={{ fontSize: "12px", color: "#636d5e", lineHeight: 1.6, marginBottom: "14px" }}>
+                      <p style={{ fontSize: "14px", color: "#636d5e", lineHeight: 1.6, marginBottom: "14px" }}>
                         This claim is approved. Specify how the warranty obligation is fulfilled.
                       </p>
 
@@ -367,21 +365,21 @@ export function BrandClaimDetail() {
                           onChange={(e) => setResolutionMethod(e.target.value)}
                           style={{
                             padding: "9px 12px",
-                            fontSize: "12px",
+                            fontSize: "14px",
                             border: "1px solid #dde3d6",
                             borderRadius: "6px",
                             outline: 0,
                           }}
                         >
-                          <option value="REPAIR">Repair under Warranty</option>
-                          <option value="REPLACEMENT">Brand New Unit Replacement</option>
+                          <option value="REPAIR">Repair</option>
+                          <option value="REPLACEMENT">Replacement</option>
                         </select>
                       </div>
 
                       <div className="business-field">
                         <label>Outcome Details *</label>
                         <textarea
-                          placeholder="Describe the resolution (e.g. Replacement unit shipped via priority courier; tracking #VCH-8829)."
+                          placeholder="Describe the repair or replacement and include any relevant delivery details."
                           value={note}
                           onChange={(e) => setNote(e.target.value)}
                           rows={3}
@@ -404,13 +402,13 @@ export function BrandClaimDetail() {
             <div className="business-panel-header">
               <h2>Customer Contact</h2>
             </div>
-            <div style={{ padding: "18px 22px", fontSize: "12px" }}>
+            <div style={{ padding: "18px 22px", fontSize: "14px" }}>
               <div style={{ marginBottom: "10px" }}>
-                <div style={{ color: "#8a9184", fontSize: "10px", fontWeight: 700 }}>NAME</div>
+                <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700 }}>NAME</div>
                 <strong style={{ color: "#242a25" }}>{customer.name}</strong>
               </div>
               <div>
-                <div style={{ color: "#8a9184", fontSize: "10px", fontWeight: 700 }}>EMAIL</div>
+                <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700 }}>EMAIL</div>
                 <div style={{ color: "#555e50" }}>{customer.email}</div>
               </div>
             </div>

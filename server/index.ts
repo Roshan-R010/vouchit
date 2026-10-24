@@ -1,3 +1,4 @@
+import { loadAnalytics } from "./analytics";
 import express from "express";
 import cors from "cors";
 import path from "node:path";
@@ -42,7 +43,7 @@ function imageFromDataUrl(value: unknown, label: string): File | null {
   if (typeof value !== "string") throw new Error(`Choose a valid ${label}.`);
   const match = /^data:(image\/(png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/i.exec(value);
   if (!match) throw new Error(`Choose a PNG, JPEG, or WebP ${label}.`);
-  const bytes = Buffer.from(match[2].replace(/\s/g, ""), "base64");
+  const bytes = Buffer.from(match[3].replace(/\s/g, ""), "base64");
   if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error(`The ${label} must be 5 MB or smaller.`);
   const extension = match[1].toLowerCase() === "image/jpeg" ? "jpg" : match[1].split("/")[1];
   return new File([bytes], `upload.${extension}`, { type: match[1].toLowerCase() });
@@ -394,7 +395,7 @@ app.post("/api/demo/:sessionId/brand/claims/:claimId/action", async (req, res) =
       if (!claim) throw new Error("This claim could not be found.");
       if (claim.status !== transition.from) throw new Error("This claim status has changed. Refresh to see latest status.");
 
-      await tx.warrantyClaim.updateMany({
+      const changed = await tx.warrantyClaim.updateMany({
         where: { ...scope, status: transition.from },
         data: {
           status: transition.to,
@@ -402,6 +403,7 @@ app.post("/api/demo/:sessionId/brand/claims/:claimId/action", async (req, res) =
         },
       });
 
+      if (changed.count !== 1) throw new Error("This claim was updated by another request. Refresh to see its current status.");
       await tx.claimEvent.create({
         data: {
           claimId,
@@ -425,7 +427,8 @@ app.post("/api/demo/:sessionId/brand/claims/:claimId/action", async (req, res) =
       return claim;
     });
 
-    res.json({ success: true, message: `Claim updated to ${transition.to}` });
+    const messages: Record<string, string> = { UNDER_REVIEW: "Review started.", APPROVED: "Claim approved. Record the resolution when the repair or replacement is complete.", REJECTED: "Claim rejected. The reason is recorded in the claim history.", INFO_REQUESTED: "Information requested. The customer can reply from their claim page.", RESOLVED: "Claim resolved. The outcome has been recorded." };
+    res.json({ success: true, message: messages[transition.to] });
   } catch (error: any) {
     console.error("Brand claim action error:", error);
     res.status(400).json({ error: error.message || "Failed to update claim" });
@@ -496,6 +499,33 @@ app.get("/api/demo/:sessionId/brand/products/:productId", async (req, res) => {
   }
 });
 
+app.post("/api/demo/:sessionId/brand/products/:productId/units", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  if (!isUuid(req.params.productId)) return res.status(400).json({ error: "Invalid product." });
+  const serialNumber = String(req.body.serialNumber || "").trim().toUpperCase();
+  const orderNumber = String(req.body.orderNumber || "").trim();
+  const deliveredOn = String(req.body.deliveredOn || "");
+  const date = new Date(`${deliveredOn}T00:00:00.000Z`);
+  if (!serialNumber || serialNumber.length > 120 || !orderNumber || orderNumber.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(deliveredOn) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== deliveredOn || dateOnly(date) > dateOnly(new Date())) {
+    return res.status(400).json({ error: "Enter the actual serial number, order reference and a valid delivery date that is not in the future." });
+  }
+  try {
+    const brand = await requireBrand(sessionId);
+    const product = await db.productModel.findFirst({ where: { id: req.params.productId, brandId: brand.id } });
+    if (!product) return res.status(404).json({ error: "Product not found." });
+    const unit = await db.$transaction(async tx => {
+      const order = await tx.purchaseOrder.upsert({ where: { brandId_orderNumber: { brandId: brand.id, orderNumber } }, create: { brandId: brand.id, orderNumber, deliveredOn: date }, update: {} });
+      if (order.deliveredOn?.getTime() !== date.getTime()) throw new Error("This order has a different delivery date. Check the original purchase record.");
+      return tx.productUnit.create({ data: { brandId: brand.id, productModelId: product.id, purchaseOrderId: order.id, serialNumber } });
+    });
+    res.status(201).json({ unit });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return res.status(409).json({ error: "This serial number is already recorded for your brand." });
+    res.status(400).json({ error: error instanceof Error && error.message.startsWith("This order") ? error.message : "Could not save the unit. Please try again." });
+  }
+});
+
 // Brand Create Product
 app.post("/api/demo/:sessionId/brand/products", async (req, res) => {
   const sessionId = checkSessionId(req, res);
@@ -508,7 +538,10 @@ app.post("/api/demo/:sessionId/brand/products", async (req, res) => {
       return res.status(400).json({ error: "Product name is required." });
     }
 
-    const duration = parseInt(warrantyMonths, 10) || 24;
+    const duration = Number(warrantyMonths);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 120) {
+      return res.status(400).json({ error: "Enter the actual warranty duration, from 1 to 120 months." });
+    }
     const slug = name
       .toLowerCase()
       .trim()
@@ -636,60 +669,16 @@ app.get("/api/demo/:sessionId/brand/registrations", async (req, res) => {
   }
 });
 
-// Brand Analytics (Fixes the 404!)
+// Analytics uses saved registration, claim and resolution-event records.
 app.get("/api/demo/:sessionId/brand/analytics", async (req, res) => {
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
   try {
     const brand = await requireBrand(sessionId);
-
-    const [allRegistrations, allClaims, products] = await Promise.all([
-      db.warrantyRegistration.findMany({
-        where: { unit: { brandId: brand.id }, customer: { demoSessionId: sessionId } },
-        include: { unit: { include: { productModel: true } } },
-      }),
-      db.warrantyClaim.findMany({
-        where: { registration: { unit: { brandId: brand.id }, customer: { demoSessionId: sessionId } } },
-        include: { registration: { include: { unit: { include: { productModel: true } } } } },
-      }),
-      db.productModel.findMany({
-        where: { brandId: brand.id },
-      }),
-    ]);
-
-    const totalClaims = allClaims.length;
-    const resolvedClaims = allClaims.filter((c) => c.status === ClaimStatus.RESOLVED || c.status === ClaimStatus.APPROVED).length;
-    const rejectedClaims = allClaims.filter((c) => c.status === ClaimStatus.REJECTED).length;
-    const approvalRate = totalClaims > 0 ? Math.round((resolvedClaims / totalClaims) * 100) : 100;
-
-    // Claims per product
-    const productStats = products.map((prod) => {
-      const prodRegistrations = allRegistrations.filter((r) => r.unit.productModelId === prod.id).length;
-      const prodClaims = allClaims.filter((c) => c.registration.unit.productModelId === prod.id).length;
-      const rate = prodRegistrations > 0 ? ((prodClaims / prodRegistrations) * 100).toFixed(1) : "0.0";
-      return {
-        id: prod.id,
-        name: prod.name,
-        registrations: prodRegistrations,
-        claims: prodClaims,
-        claimRate: `${rate}%`,
-      };
-    });
-
-    res.json({
-      brand,
-      metrics: {
-        totalRegistrations: allRegistrations.length,
-        totalClaims,
-        approvalRate: `${approvalRate}%`,
-        activeProducts: products.length,
-        averageResolutionHours: 28,
-      },
-      productStats,
-    });
-  } catch (error: any) {
-    console.error("Brand analytics error:", error);
-    res.status(500).json({ error: error.message || "Failed to load analytics" });
+    const periodDays = req.query.days === "90" ? 90 : 30;
+    res.json({ brand, ...await loadAnalytics(brand.id, sessionId, periodDays) });
+  } catch {
+    res.status(500).json({ error: "Could not load analytics. Please try again." });
   }
 });
 
@@ -738,9 +727,12 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
   try {
-    const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId } });
+    const [customer, workspaceBrand] = await Promise.all([
+      db.customer.findFirst({ where: { demoSessionId: sessionId } }),
+      db.brand.findFirst({ where: { demoSessionId: sessionId }, include: { products: { select: { id: true, name: true, slug: true, imageUrl: true, warrantyMonths: true }, orderBy: { name: "asc" } } } }),
+    ]);
     if (!customer) {
-      return res.status(404).json({ error: "Customer not found for this demo session" });
+      return res.json({ customer: null, brand: workspaceBrand, availableProducts: workspaceBrand?.products || [], warranties: [], notifications: [] });
     }
 
     const registrations = await db.warrantyRegistration.findMany({
@@ -758,7 +750,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
       take: 10,
     });
 
-    const brand = registrations[0]?.unit.brand || (await db.brand.findFirst({ where: { demoSessionId: sessionId } }));
+    const brand = workspaceBrand;
 
     const formattedWarranties = registrations.map((r) => {
       const active = isCoverageActive(r.coverageEndsOn);
@@ -770,8 +762,10 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
       return {
         registrationId: r.id,
         unitId: r.unitId,
+        productModelId: r.unit.productModelId,
         serialNumber: r.unit.serialNumber,
         productName: r.unit.productModel.name,
+        imageUrl: r.unit.productModel.imageUrl,
         brandName: r.unit.brand.name,
         warrantyMonths: r.unit.productModel.warrantyMonths,
         coverageStartsOn: r.coverageStartsOn,
@@ -797,6 +791,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
       customer,
       brand,
       warranties: formattedWarranties,
+      availableProducts: workspaceBrand?.products || [],
       notifications,
     });
   } catch (error: any) {
@@ -869,8 +864,8 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
   if (!sessionId) return;
   const { unitId, issueTitle, description, submissionId: clientSubmissionId } = req.body;
 
-  if (!unitId || !issueTitle || !description) {
-    return res.status(400).json({ error: "Please provide product, issue title, and description." });
+  if (!isUuid(String(unitId || "")) || typeof issueTitle !== "string" || typeof description !== "string" || !issueTitle.trim() || !description.trim() || issueTitle.trim().length > 120 || description.trim().length > 3000) {
+    return res.status(400).json({ error: "Choose a registered product and describe the issue. Use up to 120 characters for the summary and 3,000 for the description." });
   }
 
   const submissionId = clientSubmissionId && isUuid(clientSubmissionId) ? clientSubmissionId : randomUUID();
@@ -887,11 +882,11 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
     if (registration.claim) {
       return res.json({ success: true, claimId: registration.claim.id, alreadyExists: true });
     }
-    if (!isCoverageActive(registration.coverageEndsOn)) {
+    if (!isCoverageActive(registration.coverageEndsOn) || dateOnly(registration.coverageStartsOn) > dateOnly(new Date())) {
       return res.status(400).json({ error: "Warranty coverage has expired." });
     }
 
-    const reference = `VCH-${submissionId.replaceAll("-", "").toUpperCase().slice(0, 12)}`;
+    const reference = `VCH-${submissionId.replaceAll("-", "").toUpperCase()}`;
 
     const claim = await db.$transaction(async (tx) => {
       const created = await tx.warrantyClaim.create({
@@ -940,8 +935,13 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
 
     res.json({ success: true, claimId: claim.id, reference: claim.reference });
   } catch (error: any) {
-    console.error("Submit claim error:", error);
-    res.status(400).json({ error: error.message || "Failed to submit claim" });
+    // Concurrent submissions hit the database's unique registration constraint.
+    // Return the existing claim rather than leaking an error or creating another.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const existing = await db.warrantyClaim.findFirst({ where: { registration: { unitId, customer: { demoSessionId: sessionId }, unit: { brand: { demoSessionId: sessionId } } } }, select: { id: true } });
+      if (existing) return res.json({ success: true, claimId: existing.id, alreadyExists: true });
+    }
+    res.status(400).json({ error: "Your claim could not be submitted. Please try again." });
   }
 });
 
@@ -1106,6 +1106,16 @@ app.get("/demo/:sessionId/brand-images/:brandId/:filename", async (req, res) => 
     res.status(404).send("Not found");
   }
 });
+
+// API failures must stay JSON, including malformed/oversized request bodies.
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "API route not found. Restart the app with npm run dev." });
+});
+const apiErrorHandler: express.ErrorRequestHandler = (error, _req, res, _next) => {
+  const status = error.type === "entity.too.large" ? 413 : error.type === "entity.parse.failed" ? 400 : 500;
+  res.status(status).json({ error: status === 413 ? "Upload too large. Each image must be 5 MB or smaller." : status === 400 ? "Invalid JSON request body." : "The server could not complete this request." });
+};
+app.use(apiErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`[Vouch API Server] running on http://localhost:${PORT}`);

@@ -1,3 +1,5 @@
+import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Search, Filter, Inbox, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
@@ -43,7 +45,7 @@ export function BrandClaims() {
     if (currentProduct) query.set("product", currentProduct);
     if (currentSearch) query.set("search", currentSearch);
 
-    fetch(`/api/demo/${sessionId}/brand/claims?${query.toString()}`)
+    apiFetch(`/api/demo/${sessionId}/brand/claims?${query.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         setClaims(data.claims || []);
@@ -119,7 +121,7 @@ export function BrandClaims() {
                 border: 0,
                 background: "transparent",
                 padding: "10px 14px",
-                fontSize: "12px",
+                fontSize: "14px",
                 fontWeight: active ? 700 : 500,
                 color: active ? "#242a25" : "#727a72",
                 borderBottom: active ? "2px solid #363e31" : "2px solid transparent",
@@ -133,7 +135,7 @@ export function BrandClaims() {
               {tab.label}
               <span
                 style={{
-                  fontSize: "10px",
+                  fontSize: "14px",
                   background: active ? "#e8ebe5" : "#f2f4ef",
                   padding: "2px 7px",
                   borderRadius: "10px",
@@ -164,7 +166,7 @@ export function BrandClaims() {
           onChange={(e) => handleProductChange(e.target.value)}
           style={{
             padding: "8px 12px",
-            fontSize: "12px",
+            fontSize: "14px",
             border: "1px solid #dde3d6",
             borderRadius: "6px",
             background: "#fff",
@@ -235,11 +237,9 @@ export function BrandClaims() {
                       <small className="business-mono">SN: {claim.unit.serialNumber}</small>
                     </td>
                     <td>
-                      <span className="business-badge" style={claimBadgeStyle(claim.status)}>
-                        {claimStatusLabel[claim.status] || claim.status}
-                      </span>
+                      <ClaimStatusBadge status={claim.status}/>
                     </td>
-                    <td className="business-mono" style={{ fontSize: "11px" }}>
+                    <td className="business-mono" style={{ fontSize: "14px" }}>
                       {formatDate(claim.submittedAt)}
                     </td>
                     <td>

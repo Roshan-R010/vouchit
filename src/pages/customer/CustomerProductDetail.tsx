@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/api-fetch";
+import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Headphones, ShieldCheck, BatteryCharging } from "lucide-react";
@@ -11,7 +13,7 @@ export function CustomerProductDetail() {
   useEffect(() => {
     if (!sessionId || !unitId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/customer/products/${unitId}`)
+    apiFetch(`/api/demo/${sessionId}/customer/products/${unitId}`)
       .then((res) => res.json())
       .then((data) => {
         setRegistration(data.registration);
@@ -54,21 +56,22 @@ export function CustomerProductDetail() {
       </div>
 
       <div className="form-body">
+        {unit.productModel.imageUrl && <div style={{ height: 240, marginBottom: 24 }}><ProductPhoto src={unit.productModel.imageUrl} alt={unit.productModel.name} /></div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "26px" }}>
           <div>
-            <div style={{ fontSize: "11px", color: "#888", fontWeight: 700 }}>STAMPED UNIT ID</div>
+            <div style={{ fontSize: "14px", color: "#888", fontWeight: 700 }}>STAMPED UNIT ID</div>
             <strong style={{ fontSize: "14px" }}>{unit.serialNumber}</strong>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "#888", fontWeight: 700 }}>PURCHASE ORDER</div>
+            <div style={{ fontSize: "14px", color: "#888", fontWeight: 700 }}>PURCHASE ORDER</div>
             <div style={{ fontSize: "14px" }}>{unit.purchaseOrder.orderNumber}</div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "#888", fontWeight: 700 }}>DELIVERY DATE</div>
+            <div style={{ fontSize: "14px", color: "#888", fontWeight: 700 }}>DELIVERY DATE</div>
             <div>{unit.purchaseOrder.deliveredOn ? formatDate(unit.purchaseOrder.deliveredOn) : "N/A"}</div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "#888", fontWeight: 700 }}>COVERAGE STATUS</div>
+            <div style={{ fontSize: "14px", color: "#888", fontWeight: 700 }}>COVERAGE STATUS</div>
             <span className={`badge ${active ? "" : "expired"}`}>
               {active ? `Active (${days} days remaining)` : "Expired"}
             </span>
@@ -85,14 +88,14 @@ export function CustomerProductDetail() {
         <div style={{ marginTop: "24px", display: "flex", gap: "12px" }}>
           {claim ? (
             <Link to={`/demo/${sessionId}/customer/claims/${claim.id}`} className="action">
-              View Existing Claim
+              View claim
             </Link>
           ) : active ? (
             <Link to={`/demo/${sessionId}/customer/claims/new?unitId=${unit.id}`} className="action">
-              File a Warranty Claim
+              Raise a claim
             </Link>
           ) : (
-            <span style={{ fontSize: "13px", color: "#888" }}>This warranty has expired and cannot accept claims.</span>
+            <span style={{ fontSize: "15px", color: "#888" }}>This warranty has expired and cannot accept claims.</span>
           )}
         </div>
       </div>

@@ -24,6 +24,8 @@ import CustomerProductDetail from "./pages/customer/CustomerProductDetail";
 import CustomerNewClaim from "./pages/customer/CustomerNewClaim";
 import CustomerClaimDetail from "./pages/customer/CustomerClaimDetail";
 import CustomerRegister from "./pages/customer/CustomerRegister";
+import CustomerProductPicker from "./pages/customer/CustomerProductPicker";
+import CustomerSupport from "./pages/customer/CustomerSupport";
 
 export function App() {
   return (
@@ -52,8 +54,9 @@ export function App() {
       {/* Customer Portal Routes */}
       <Route path="/demo/:sessionId/customer" element={<CustomerLayout />}>
         <Route index element={<CustomerDashboard />} />
+        <Route path="register" element={<CustomerProductPicker />} />
         <Route path="products/:unitId" element={<CustomerProductDetail />} />
-        <Route path="claims" element={<CustomerDashboard />} />
+        <Route path="claims" element={<CustomerSupport />} />
         <Route path="claims/new" element={<CustomerNewClaim />} />
         <Route path="claims/:claimId" element={<CustomerClaimDetail />} />
       </Route>

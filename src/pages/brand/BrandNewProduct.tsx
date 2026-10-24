@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/api-fetch";
+import { readApiResponse } from "@/lib/api-response";
 import React, { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -8,7 +10,7 @@ export function BrandNewProduct() {
 
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
-  const [warrantyMonths, setWarrantyMonths] = useState(24);
+  const [warrantyMonths, setWarrantyMonths] = useState<number | "">("");
   const [serialNumber, setSerialNumber] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
   const [deliveredOn, setDeliveredOn] = useState("");
@@ -24,7 +26,7 @@ export function BrandNewProduct() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/demo/${sessionId}/brand/products`, {
+      const response = await apiFetch(`/api/demo/${sessionId}/brand/products`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -38,7 +40,7 @@ export function BrandNewProduct() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(data.error || "Failed to create product");
       }
@@ -61,7 +63,7 @@ export function BrandNewProduct() {
         <div>
           <div className="business-eyebrow">New Catalog Item</div>
           <h1>Add Warrantied Product</h1>
-          <p>Define product specifications, duration of standard warranty, and seed initial units.</p>
+          <p>Define product specifications, duration of standard warranty, and add delivered units.</p>
         </div>
       </div>
 
@@ -73,7 +75,7 @@ export function BrandNewProduct() {
             <label>Product Name *</label>
             <input
               type="text"
-              placeholder="e.g. Kestrel ANC Max Wireless Headphones"
+              placeholder="Product model name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -90,7 +92,7 @@ export function BrandNewProduct() {
               <label>SKU / Model Number</label>
               <input
                 type="text"
-                placeholder="e.g. KST-ANC-01"
+                placeholder="Manufacturer SKU"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
               />
@@ -103,16 +105,16 @@ export function BrandNewProduct() {
                 min={1}
                 max={120}
                 value={warrantyMonths}
-                onChange={(e) => setWarrantyMonths(parseInt(e.target.value, 10))}
+                onChange={(e) => setWarrantyMonths(e.target.value === "" ? "" : Number(e.target.value))}
                 required
               />
             </div>
           </div>
 
           <details className="business-details" open>
-            <summary>Seed Initial Stamped Unit & Order (Optional)</summary>
+            <summary>Add a delivered unit and order (optional)</summary>
             <div className="business-hint">
-              Adding a unit allows you to test customer registration right away with a known stamped ID.
+              Enter the serial number and order from the actual purchase to enable customer registration.
             </div>
 
             <div className="business-form-grid">
@@ -120,7 +122,7 @@ export function BrandNewProduct() {
                 <label>Stamped Unit ID (Serial Number)</label>
                 <input
                   type="text"
-                  placeholder="e.g. KST-MAX-9921"
+                  placeholder="Actual serial number"
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
                 />
@@ -130,7 +132,7 @@ export function BrandNewProduct() {
                 <label>Purchase Order Reference</label>
                 <input
                   type="text"
-                  placeholder="e.g. ORD-89410"
+                  placeholder="Actual order reference"
                   value={orderNumber}
                   onChange={(e) => setOrderNumber(e.target.value)}
                 />

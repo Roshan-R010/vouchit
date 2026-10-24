@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { CustomerNav } from "@/components/customer-nav";
@@ -12,7 +13,7 @@ export function CustomerLayout() {
 
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/demo/${sessionId}/customer`)
+    apiFetch(`/api/demo/${sessionId}/customer`)
       .then((res) => res.json())
       .then((data) => {
         if (data.customer?.name) setCustomerName(data.customer.name);

@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
+import React, { useEffect, useRef, useState } from "react";
+import { readApiResponse } from "@/lib/api-response";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 
@@ -13,21 +15,36 @@ export function CustomerNewClaim() {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submissionId] = useState(() => crypto.randomUUID());
+  const submittingRef = useRef(false);
+  const [checking, setChecking] = useState(true);
+  const [canSubmit, setCanSubmit] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (!unitId) { setError("Choose a registered product from your dashboard to start a claim."); setChecking(false); return; }
+    apiFetch(`/api/demo/${sessionId}/customer/products/${unitId}`).then(readApiResponse).then(data => {
+      if (!active) return;
+      if (data.registration.claim) navigate(`/demo/${sessionId}/customer/claims/${data.registration.claim.id}`, { replace: true });
+      else { setCanSubmit(true); setChecking(false); }
+    }).catch(cause => { if (active) { setError(cause.message); setChecking(false); } });
+    return () => { active = false; };
+  }, [sessionId, unitId, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sessionId || !unitId) return;
+    if (!sessionId || !unitId || submittingRef.current || checking || !canSubmit) return;
+    submittingRef.current = true;
     setError(null);
     setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/demo/${sessionId}/customer/claims`, {
+      const response = await apiFetch(`/api/demo/${sessionId}/customer/claims`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unitId, issueTitle, description }),
+        body: JSON.stringify({ unitId, issueTitle, description, submissionId }),
       });
 
-      const data = await response.json();
+      const data = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(data.error || "Failed to submit warranty claim");
       }
@@ -36,6 +53,7 @@ export function CustomerNewClaim() {
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -46,8 +64,8 @@ export function CustomerNewClaim() {
         <Link to={`/demo/${sessionId}/customer`} className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
-        <h1>File a Warranty Claim</h1>
-        <p>Submit an issue for review under your active hardware warranty.</p>
+        <h1>Submit a warranty claim</h1>
+        <p>Describe the issue so your brand can review it. Each registered product can have one claim.</p>
       </div>
 
       <div className="form-body">
@@ -55,10 +73,12 @@ export function CustomerNewClaim() {
 
         <form onSubmit={handleSubmit}>
           <div className="field">
-            <label>Issue Summary *</label>
+            <label htmlFor="claim-summary">Issue summary</label>
             <input
               type="text"
-              placeholder="e.g. Left earcup audio cut out completely"
+              id="claim-summary"
+              maxLength={120}
+              placeholder="Briefly describe the problem"
               value={issueTitle}
               onChange={(e) => setIssueTitle(e.target.value)}
               required
@@ -66,8 +86,10 @@ export function CustomerNewClaim() {
           </div>
 
           <div className="field">
-            <label>Detailed Description of the Issue *</label>
+            <label htmlFor="claim-description">What happened?</label>
             <textarea
+              id="claim-description"
+              maxLength={3000}
               placeholder="Describe when the issue started, steps you've taken to troubleshoot, and current behavior..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -76,8 +98,8 @@ export function CustomerNewClaim() {
             />
           </div>
 
-          <button type="submit" disabled={submitting} className="action" style={{ width: "100%", justifyContent: "center" }}>
-            {submitting ? "Submitting Claim..." : "Submit Claim for Review"}
+          <button type="submit" disabled={submitting || checking || !canSubmit || !unitId} className="action" style={{ width: "100%", justifyContent: "center" }}>
+            {checking ? "Checking warranty…" : submitting ? "Submitting…" : "Submit claim"}
           </button>
         </form>
       </div>

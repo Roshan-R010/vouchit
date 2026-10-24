@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ShieldCheck, CheckCircle } from "lucide-react";
 
@@ -13,6 +14,8 @@ export function CustomerRegister() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => { if (!sessionId) return; void apiFetch(`/api/demo/${sessionId}/customer`).then(response => response.json()).then(data => { if (data.customer) { setCustomerName(current => current || data.customer.name); setEmail(current => current || data.customer.email); } }).catch(() => {}); }, [sessionId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sessionId || !brandSlug || !productSlug) return;
@@ -20,7 +23,7 @@ export function CustomerRegister() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/demo/${sessionId}/register`, {
+      const response = await apiFetch(`/api/demo/${sessionId}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -68,7 +71,7 @@ export function CustomerRegister() {
               onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
               required
             />
-            <small style={{ fontSize: "11px", color: "#888" }}>
+            <small style={{ fontSize: "14px", color: "#888" }}>
               Located directly on the hardware body or retail gift box barcode.
             </small>
           </div>

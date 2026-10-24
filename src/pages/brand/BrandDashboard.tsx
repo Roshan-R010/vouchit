@@ -1,3 +1,6 @@
+import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { apiFetch } from "@/lib/api-fetch";
+import { RegistrationChart } from "@/components/registration-chart";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowUpRight, Plus, Inbox, Package, Users, ShieldCheck, CheckCircle2, Clock, AlertCircle } from "lucide-react";
@@ -28,7 +31,7 @@ export function BrandDashboard() {
   useEffect(() => {
     if (!sessionId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/brand`)
+    apiFetch(`/api/demo/${sessionId}/brand`)
       .then((res) => res.json())
       .then((resData) => {
         setData(resData);
@@ -59,7 +62,7 @@ export function BrandDashboard() {
     );
   }
 
-  const brand = data?.brand || { name: "Kestrel Audio" };
+  const brand = data?.brand || { name: "Your brand" };
   const metrics = data?.metrics || {
     totalRegistrations: 0,
     openClaimsCount: 0,
@@ -69,7 +72,7 @@ export function BrandDashboard() {
   const chartData: { label: string; count: number }[] = data?.chartData || [];
   const recentClaims: any[] = data?.recentClaims || [];
 
-  const maxChartCount = Math.max(1, ...chartData.map((d) => d.count));
+
 
   return (
     <div>
@@ -92,47 +95,47 @@ export function BrandDashboard() {
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "26px" }}>
         <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#7a807b", fontSize: "11px", fontWeight: 600 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
             <span>REGISTERED UNITS</span>
             <ShieldCheck size={16} color="#556b4f" />
           </div>
           <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: "#242a25", margin: "8px 0 2px" }}>
             {metrics.totalRegistrations}
           </div>
-          <div style={{ fontSize: "11px", color: "#8a9184" }}>Active warranty records</div>
+          <div style={{ fontSize: "14px", color: "#596258" }}>Active warranty records</div>
         </div>
 
         <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#7a807b", fontSize: "11px", fontWeight: 600 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
             <span>OPEN CLAIMS</span>
             <Inbox size={16} color="#8a7337" />
           </div>
           <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: "#242a25", margin: "8px 0 2px" }}>
             {metrics.openClaimsCount}
           </div>
-          <div style={{ fontSize: "11px", color: "#8a9184" }}>Under active processing</div>
+          <div style={{ fontSize: "14px", color: "#596258" }}>Under active processing</div>
         </div>
 
         <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#7a807b", fontSize: "11px", fontWeight: 600 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
             <span>NEEDS REVIEW</span>
             <AlertCircle size={16} color="#a5655d" />
           </div>
           <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: metrics.needsReviewCount > 0 ? "#a5655d" : "#242a25", margin: "8px 0 2px" }}>
             {metrics.needsReviewCount}
           </div>
-          <div style={{ fontSize: "11px", color: "#8a9184" }}>Requires decision today</div>
+          <div style={{ fontSize: "14px", color: "#596258" }}>Requires decision today</div>
         </div>
 
         <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#7a807b", fontSize: "11px", fontWeight: 600 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
             <span>CATALOG MODELS</span>
             <Package size={16} color="#4f6798" />
           </div>
           <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: "#242a25", margin: "8px 0 2px" }}>
             {metrics.productsCount}
           </div>
-          <div style={{ fontSize: "11px", color: "#8a9184" }}>Products in warranty catalog</div>
+          <div style={{ fontSize: "14px", color: "#596258" }}>Products in warranty catalog</div>
         </div>
       </div>
 
@@ -148,29 +151,7 @@ export function BrandDashboard() {
           </Link>
         </div>
         <div style={{ padding: "24px 22px 18px" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", height: "130px", borderBottom: "1px solid #eef0eb", paddingBottom: "8px" }}>
-            {chartData.map((day, idx) => {
-              const heightPercent = Math.max(8, Math.round((day.count / maxChartCount) * 100));
-              return (
-                <div key={idx} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }} title={`${day.label}: ${day.count} registrations`}>
-                  <div
-                    style={{
-                      width: "100%",
-                      maxWidth: "20px",
-                      height: `${heightPercent}%`,
-                      background: day.count > 0 ? "#536148" : "#edf1ea",
-                      borderRadius: "3px 3px 0 0",
-                      transition: "height 0.3s ease",
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#9ca395", marginTop: "8px" }}>
-            <span>30 days ago</span>
-            <span>Today</span>
-          </div>
+          <RegistrationChart data={chartData} />
         </div>
       </div>
 
@@ -217,11 +198,9 @@ export function BrandDashboard() {
                     <td>{claim.customerName}</td>
                     <td>{claim.productName}</td>
                     <td>
-                      <span className="business-badge" style={claimBadgeStyle(claim.status)}>
-                        {claimStatusLabel[claim.status] || claim.status}
-                      </span>
+                      <ClaimStatusBadge status={claim.status}/>
                     </td>
-                    <td className="business-mono" style={{ fontSize: "11px" }}>
+                    <td className="business-mono" style={{ fontSize: "14px" }}>
                       {formatDate(claim.submittedAt)}
                     </td>
                     <td style={{ textAlign: "right" }}>

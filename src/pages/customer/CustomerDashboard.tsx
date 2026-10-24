@@ -1,6 +1,8 @@
+import { apiFetch } from "@/lib/api-fetch";
+import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Plus, ArrowRight, ShieldCheck, AlertCircle, Headphones, BatteryCharging, Box, ExternalLink } from "lucide-react";
+import { ArrowUpRight, Box, Plus } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 
 export function CustomerDashboard() {
@@ -12,7 +14,7 @@ export function CustomerDashboard() {
   useEffect(() => {
     if (!sessionId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/customer`)
+    apiFetch(`/api/demo/${sessionId}/customer`)
       .then((res) => res.json())
       .then((resData) => {
         setData(resData);
@@ -43,10 +45,9 @@ export function CustomerDashboard() {
     );
   }
 
-  const customer = data?.customer;
-  const brand = data?.brand || { name: "Kestrel Audio", slug: "kestrel" };
+  const brand = data?.brand || { name: "Your brand", slug: "" };
   const warranties: any[] = data?.warranties || [];
-  const notifications: any[] = data?.notifications || [];
+  const productsToRegister: any[] = (data?.availableProducts || []).filter((product: any) => !warranties.some((w) => w.productModelId === product.id));
 
   const filteredWarranties = warranties.filter((w) => {
     if (filter === "active") return w.isActive;
@@ -54,21 +55,16 @@ export function CustomerDashboard() {
     return true;
   });
 
-  const activeClaims = warranties.filter((w) => w.claim && w.claim.status !== "RESOLVED" && w.claim.status !== "REJECTED");
-
   return (
     <main className="page-wrap content">
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-copy">
           <span className="eyebrow">{brand.name} Customer Care</span>
-          <h1>Product coverage, always in reach.</h1>
-          <p>View active warranties, track service claims, and register new stamped hardware.</p>
+          <h1>Your products,<br/>covered.</h1>
+          <p>Register a product, check remaining coverage, and track support requests.</p>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="headphone" />
-        </div>
-        <div className="hero-stripe" />
+        {data?.availableProducts?.[0]?.imageUrl && <div className="customer-hero-photo" aria-hidden="true"><ProductPhoto src={data.availableProducts[0].imageUrl} alt=""/></div>}
       </section>
 
       {/* Filters and Registration Action */}
@@ -77,13 +73,13 @@ export function CustomerDashboard() {
           className={`filter ${filter === "all" ? "active" : ""}`}
           onClick={() => setFilter("all")}
         >
-          All Products <span className="filter-count">{warranties.length}</span>
+          My warranties <span className="filter-count">{warranties.length}</span>
         </button>
         <button
           className={`filter ${filter === "active" ? "active" : ""}`}
           onClick={() => setFilter("active")}
         >
-          Active Coverage <span className="filter-count">{warranties.filter((w) => w.isActive).length}</span>
+          Active <span className="filter-count">{warranties.filter((w) => w.isActive).length}</span>
         </button>
         <button
           className={`filter ${filter === "expired" ? "active" : ""}`}
@@ -93,28 +89,25 @@ export function CustomerDashboard() {
         </button>
 
         <div style={{ marginLeft: "auto" }}>
-          <Link to={`/demo/${sessionId}/register/${brand.slug}/kestrel-pro-headphones`} className="action" style={{ fontSize: "11px", padding: "8px 14px" }}>
-            <Plus size={14} /> Register another product
+          <Link to={`/demo/${sessionId}/customer/register`} className="action">
+            <Plus size={16} /> Register a product
           </Link>
         </div>
       </div>
 
       {/* Warranties Grid */}
+      {productsToRegister.length > 0 && <section aria-label={`${brand.name} product catalog`}><div className="section-head"><div><h2>{brand.name} products</h2><p>Choose a product you own to register its warranty.</p></div></div><div className="customer-catalog">{productsToRegister.map((product: any) => <article key={product.id}><div className="customer-catalog-photo">{product.imageUrl && <ProductPhoto src={product.imageUrl} alt={product.name}/>}</div><div><h2>{product.name}</h2><p>{product.warrantyMonths} months of warranty</p><Link className="action" to={`/demo/${sessionId}/register/${brand.slug}/${product.slug}`}>Register warranty <ArrowUpRight size={16}/></Link></div></article>)}</div></section>}
       {filteredWarranties.length === 0 ? (
         <div className="blank-state" style={{ margin: "32px 0" }}>
-          <h3>No warrantied products found</h3>
-          <p>You do not currently have any products matching this filter.</p>
+          <h3>{warranties.length ? "No warranties match this filter" : "No registered products yet"}</h3>
+          <p>{warranties.length ? "Choose another filter to see your products." : "Register a product to see its coverage and time remaining."}</p>
         </div>
       ) : (
         <div className="product-grid">
           {filteredWarranties.map((w) => (
             <article key={w.unitId} className="product-card">
               <div className="product-art">
-                {w.productName.toLowerCase().includes("charge") ? (
-                  <BatteryCharging size={54} color="#353b34" />
-                ) : (
-                  <Headphones size={54} color="#353b34" />
-                )}
+                {w.imageUrl ? <ProductPhoto src={w.imageUrl} alt={w.productName} /> : <Box size={54} color="#353b34" />}
               </div>
 
               <div className="product-copy">
@@ -127,7 +120,7 @@ export function CustomerDashboard() {
 
                 <div className="warranty-remaining">
                   <strong>{w.isActive ? w.daysRemaining : 0}</strong>
-                  <span>{w.isActive ? "days coverage remaining" : "days coverage expired"}</span>
+                  <span>{w.isActive ? "days of warranty left" : "warranty expired"}</span>
                 </div>
 
                 <div className="progress">
@@ -141,19 +134,19 @@ export function CustomerDashboard() {
 
                 <div className="card-actions">
                   <Link to={`/demo/${sessionId}/customer/products/${w.unitId}`} className="action secondary">
-                    Details
+                    Warranty details
                   </Link>
 
                   {w.claim ? (
                     <Link to={`/demo/${sessionId}/customer/claims/${w.claim.id}`} className="action">
-                      Track Claim
+                      View claim <ArrowUpRight size={15}/>
                     </Link>
                   ) : w.isActive ? (
                     <Link to={`/demo/${sessionId}/customer/claims/new?unitId=${w.unitId}`} className="action">
-                      File Claim
+                      Raise a claim <ArrowUpRight size={15}/>
                     </Link>
                   ) : (
-                    <span style={{ fontSize: "11px", color: "#888", alignSelf: "center", marginLeft: "auto" }}>
+                    <span style={{ fontSize: "14px", color: "#888", alignSelf: "center", marginLeft: "auto" }}>
                       Expired
                     </span>
                   )}
@@ -164,62 +157,6 @@ export function CustomerDashboard() {
         </div>
       )}
 
-      {/* Active Claims Attention Section */}
-      {activeClaims.length > 0 && (
-        <div>
-          <div className="section-head">
-            <div>
-              <h2>Ongoing Claims In Progress</h2>
-              <p>Updates on your recent service and warranty requests.</p>
-            </div>
-          </div>
-
-          <div className="claims-list">
-            {activeClaims.map((w) => (
-              <div key={w.claim.id} className="claim-row">
-                <div>
-                  <div className="claim-name">{w.claim.issueTitle}</div>
-                  <div className="muted">{w.claim.reference}</div>
-                </div>
-                <div className="claim-product">{w.productName}</div>
-                <div className="claim-date muted">{formatDate(w.claim.submittedAt)}</div>
-                <div>
-                  <span className={`status-pill ${w.claim.status.toLowerCase().replace("_", "-")}`}>
-                    {w.claim.status.replace("_", " ")}
-                  </span>
-                </div>
-                <Link to={`/demo/${sessionId}/customer/claims/${w.claim.id}`}>
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Notifications Drawer */}
-      {notifications.length > 0 && (
-        <div style={{ marginTop: "40px" }}>
-          <div className="section-head">
-            <div>
-              <h2>Recent Service Notifications</h2>
-              <p>Simulated transactional notifications regarding warranty and claims.</p>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: "10px" }}>
-            {notifications.slice(0, 3).map((notif: any) => (
-              <div key={notif.id} className="message" style={{ margin: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                  <strong>{notif.subject}</strong>
-                  <span style={{ fontSize: "11px", color: "#888" }}>{formatDate(notif.createdAt)}</span>
-                </div>
-                <div style={{ fontSize: "12px", color: "#555" }}>{notif.previewBody}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </main>
   );
 }

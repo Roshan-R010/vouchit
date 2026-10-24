@@ -1,3 +1,4 @@
+import { VouchLogo } from "@/components/vouch-logo";
 "use client";
 
 import Link from "next/link";
@@ -13,7 +14,7 @@ export function CustomerNav({ sessionId, customerName = "Customer", brandName, b
     { label: "Support", href: sessionId ? `${root}/customer/claims` : "/#how-it-works" },
   ];
   return <header className="topbar page-wrap">
-    <Link href={sessionId ? `${root}/customer` : "/"} className="brandmark" aria-label="Vouch home"><span className="brandmark-symbol">V</span>vouch</Link>
+    <Link href={sessionId ? `${root}/customer` : "/"} className="brandmark" aria-label="Vouch home"><VouchLogo /></Link>
     <nav className="nav-links" aria-label="Customer navigation">{items.map((item) => {
       const active = item.label === "Warranties" ? (pathname.includes("/customer") && !pathname.includes("/customer/claims")) || pathname.includes("/register") : pathname.includes("/customer/claims");
       return <Link key={item.label} href={item.href} className={`nav-link ${active ? "active" : ""}`}>
@@ -21,9 +22,9 @@ export function CustomerNav({ sessionId, customerName = "Customer", brandName, b
       </Link>;
     })}</nav>
     <div className="topbar-end">
-      {sessionId && brandName && <span style={{ fontSize: 12, color: "#777b78", fontWeight: 450, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>{brandLogoUrl && <img src={brandLogoUrl} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: "contain" }}/>} {brandName} · Customer portal</span>}
-      {sessionId && <Link className={`nav-link brand-switch ${pathname.includes("/brand") ? "active" : ""}`} href={`${root}/brand`} style={{ fontSize: 11, color: "#777b78", textDecoration: "none", marginRight: 8 }}>Brand view</Link>}
-      {sessionId && <><span className="avatar">{customerName.slice(0, 1).toUpperCase()}</span><span style={{ fontSize: 13, fontWeight: 600, color: "#171918" }}>{customerName}</span></>}
+      {sessionId && brandName && <span style={{ fontSize: 14, color: "#56616c", fontWeight: 450, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>{brandLogoUrl && <img src={brandLogoUrl} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: "contain" }}/>} {brandName} · Customer portal</span>}
+      {sessionId && <Link className={`nav-link brand-switch ${pathname.includes("/brand") ? "active" : ""}`} href={`${root}/brand`} style={{ fontSize: 14, color: "#56616c", textDecoration: "none", marginRight: 8 }}>Brand view</Link>}
+      {sessionId && <><span className="avatar">{customerName.slice(0, 1).toUpperCase()}</span><span style={{ fontSize: 14, fontWeight: 600, color: "#171918" }}>{customerName}</span></>}
     </div>
   </header>;
 }

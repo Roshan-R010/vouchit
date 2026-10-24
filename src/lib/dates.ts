@@ -1,5 +1,6 @@
-export function dateOnly(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+export function dateOnly(date: Date | string | number) {
+  const parsed = new Date(date);
+  return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
 }
 
 export function addCalendarMonths(date: Date, months: number) {
@@ -12,15 +13,15 @@ export function addCalendarMonths(date: Date, months: number) {
   return dateOnly(result);
 }
 
-export function daysRemaining(end: Date) {
+export function daysRemaining(end: Date | string | number) {
   const today = dateOnly(new Date()).getTime();
   return Math.max(0, Math.ceil((dateOnly(end).getTime() - today) / 86_400_000));
 }
 
-export function isCoverageActive(end: Date) {
+export function isCoverageActive(end: Date | string | number) {
   return dateOnly(end).getTime() >= dateOnly(new Date()).getTime();
 }
 
-export function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+export function formatDate(date: Date | string | number) {
+  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(date));
 }

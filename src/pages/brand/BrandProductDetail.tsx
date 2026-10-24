@@ -1,3 +1,6 @@
+import { AddProductUnit } from "@/components/add-product-unit";
+import { apiFetch } from "@/lib/api-fetch";
+import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Package, ExternalLink } from "lucide-react";
@@ -5,6 +8,7 @@ import { formatDate } from "@/lib/dates";
 
 export function BrandProductDetail() {
   const { sessionId, productId } = useParams<{ sessionId: string; productId: string }>();
+  const [version, setVersion] = useState(0);
   const [product, setProduct] = useState<any>(null);
   const [brand, setBrand] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -12,7 +16,7 @@ export function BrandProductDetail() {
   useEffect(() => {
     if (!sessionId || !productId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/brand/products/${productId}`)
+    apiFetch(`/api/demo/${sessionId}/brand/products/${productId}`)
       .then((res) => res.json())
       .then((data) => {
         setProduct(data.product);
@@ -23,7 +27,7 @@ export function BrandProductDetail() {
         console.error("Failed to load product:", err);
         setLoading(false);
       });
-  }, [sessionId, productId]);
+  }, [sessionId, productId, version]);
 
   if (loading) {
     return (
@@ -55,7 +59,7 @@ export function BrandProductDetail() {
     );
   }
 
-  const regUrl = `${window.location.origin}/demo/${sessionId}/register/${brand?.slug || "kestrel"}/${product.slug}`;
+  const regUrl = `${window.location.origin}/demo/${sessionId}/register/${brand?.slug || ""}/${product.slug}`;
 
   return (
     <div>
@@ -65,7 +69,7 @@ export function BrandProductDetail() {
 
       <div className="business-product-overview">
         <div className="business-product-image">
-          {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <Package size={44} />}
+          {product.imageUrl ? <ProductPhoto src={product.imageUrl} alt={product.name} /> : <Package size={44} />}
         </div>
         <div>
           <div className="business-eyebrow">Product Model</div>
@@ -76,7 +80,7 @@ export function BrandProductDetail() {
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <span className="business-badge success">{product.units?.length || 0} Units Tracked</span>
             <a
-              href={`/demo/${sessionId}/register/${brand?.slug || "kestrel"}/${product.slug}`}
+              href={`/demo/${sessionId}/register/${brand?.slug || ""}/${product.slug}`}
               target="_blank"
               rel="noreferrer"
               className="business-text-link"
@@ -87,6 +91,7 @@ export function BrandProductDetail() {
         </div>
       </div>
 
+      {sessionId && productId && <AddProductUnit sessionId={sessionId} productId={productId} onSaved={() => setVersion(value => value + 1)}/>}
       {/* Units Table */}
       <div className="business-panel">
         <div className="business-panel-header">

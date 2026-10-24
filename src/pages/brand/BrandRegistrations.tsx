@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
@@ -11,7 +12,7 @@ export function BrandRegistrations() {
   useEffect(() => {
     if (!sessionId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/brand/registrations`)
+    apiFetch(`/api/demo/${sessionId}/brand/registrations`)
       .then((res) => res.json())
       .then((data) => {
         setRegistrations(data.registrations || []);
@@ -89,7 +90,7 @@ export function BrandRegistrations() {
                         {r.customer.name}
                         <small>{r.customer.email}</small>
                       </td>
-                      <td className="business-mono" style={{ fontSize: "11px" }}>
+                      <td className="business-mono" style={{ fontSize: "14px" }}>
                         {formatDate(r.coverageStartsOn)} → {formatDate(r.coverageEndsOn)}
                         <small>{active ? `${days} days remaining` : "Expired"}</small>
                       </td>

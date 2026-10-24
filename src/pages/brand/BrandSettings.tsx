@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/api-fetch";
+import { readApiResponse } from "@/lib/api-response";
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -13,7 +15,7 @@ export function BrandSettings() {
 
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/demo/${sessionId}/brand/settings`)
+    apiFetch(`/api/demo/${sessionId}/brand/settings`)
       .then((res) => res.json())
       .then((data) => {
         if (data.brand) {
@@ -31,14 +33,14 @@ export function BrandSettings() {
     setNotice(null);
 
     try {
-      const res = await fetch(`/api/demo/${sessionId}/brand/settings`, {
+      const res = await apiFetch(`/api/demo/${sessionId}/brand/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, supportEmail, removeLogo, logoDataUrl: logo ? await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(logo); }) : undefined }),
       });
-      const data = await res.json();
+      const data = await readApiResponse(res);
       if (res.ok) {
-        setNotice("Workspace settings saved successfully.");
+        setBrand(data.brand); setLogo(null); setRemoveLogo(false); setNotice("Brand details saved.");
       } else {
         setNotice(data.error || "Failed to save settings.");
       }
@@ -82,11 +84,11 @@ export function BrandSettings() {
             <label>Brand logo <span>Optional · PNG, JPG or WebP up to 5 MB</span></label>
             {brand?.logoUrl && <img src={brand.logoUrl} alt="Current brand logo" style={{ width: 72, height: 72, objectFit: "contain", border: "1px solid #e2e6de", borderRadius: 8, padding: 6 }} />}
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => { setLogo(e.target.files?.[0] || null); if (e.target.files?.[0]) setRemoveLogo(false); }} />
-            {brand?.logoUrl && <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}><input type="checkbox" checked={removeLogo} onChange={(e) => setRemoveLogo(e.target.checked)} /> Remove current logo</label>}
+            {brand?.logoUrl && <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={removeLogo} onChange={(e) => setRemoveLogo(e.target.checked)} /> Remove current logo</label>}
           </div>
 
           <div className="business-field">
-            <label>Demo Session Identifier</label>
+            <label>Workspace identifier</label>
             <input type="text" value={sessionId || ""} disabled style={{ background: "#f5f6f3", color: "#777" }} />
           </div>
 

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Users, Mail, ShieldCheck, Inbox } from "lucide-react";
@@ -11,7 +12,7 @@ export function BrandCustomers() {
   useEffect(() => {
     if (!sessionId) return;
     setLoading(true);
-    fetch(`/api/demo/${sessionId}/brand/customers`)
+    apiFetch(`/api/demo/${sessionId}/brand/customers`)
       .then((res) => res.json())
       .then((data) => {
         setCustomers(data.customers || []);

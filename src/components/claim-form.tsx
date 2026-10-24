@@ -1,17 +1,18 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { submitClaimAction, type ClaimActionState } from "@/app/actions";
+import { submitClaimAction } from "@/app/actions";
 import { ImagePicker } from "@/components/image-picker";
 
 export function ClaimForm({ sessionId, unitId, submissionId }: { sessionId: string; unitId: string; submissionId: string }) {
   const [files, setFiles] = useState<File[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [state, action, pending] = useActionState(async (previous: ClaimActionState, form: FormData) => {
+  const [state, action, pending] = useActionState(async (_previous: { error?: string }, form: FormData): Promise<{ error?: string }> => {
     form.delete("photos");
     files.forEach((file) => form.append("photos", file));
-    return submitClaimAction(previous, form);
+    await submitClaimAction(form);
+    return {};
   }, {});
   return <form action={action}>
     <input type="hidden" name="sessionId" value={sessionId}/><input type="hidden" name="unitId" value={unitId}/><input type="hidden" name="submissionId" value={submissionId}/>
