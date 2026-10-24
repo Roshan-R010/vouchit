@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, Package, Users, Settings, ArrowUpRight, RotateCcw } from "lucide-react";
+import { LayoutDashboard, Inbox, Package, Users, ClipboardList, BarChart2, Settings, ArrowUpRight, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 
 export function BrandNav({ sessionId, brandName }: { sessionId: string; brandName: string }) {
@@ -14,6 +14,8 @@ export function BrandNav({ sessionId, brandName }: { sessionId: string; brandNam
     { title: "Claims", href: `${base}/claims`, icon: Inbox },
     { title: "Products", href: `${base}/products`, icon: Package },
     { title: "Customers", href: `${base}/customers`, icon: Users },
+    { title: "Registrations", href: `${base}/registrations`, icon: ClipboardList },
+    { title: "Analytics", href: `${base}/analytics`, icon: BarChart2 },
   ];
   return <aside className="business-sidebar">
     <Link href={base} className="business-logo"><span>v</span>vouch<span className="business-logo-label">Business</span></Link>
