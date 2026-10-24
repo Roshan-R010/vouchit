@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./uploads.css";
 
 export const metadata: Metadata = {
   title: "Vouch — Warranty, made clear",

@@ -3,8 +3,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { ArrowLeft, CircleCheck, Headphones } from "lucide-react";
 import { CustomerNav } from "@/components/customer-nav";
-import { SubmitClaimButton } from "@/components/submit-claim-button";
-import { submitClaimAction } from "@/app/actions";
+import { ClaimForm } from "@/components/claim-form";
 import { db } from "@/lib/db";
 import { daysRemaining, formatDate, isCoverageActive } from "@/lib/dates";
 
@@ -167,64 +166,7 @@ export default async function NewClaimPage({ params, searchParams }: Props) {
                 demo.
               </div>
             ) : (
-              <form action={submitClaimAction}>
-                <input type="hidden" name="sessionId" value={sessionId} />
-                <input type="hidden" name="unitId" value={unitId} />
-                <input type="hidden" name="submissionId" value={randomUUID()} />
-                <div className="step-row">
-                  <span className="current">
-                    <i className="step-dot">1</i> Issue details
-                  </span>
-                  <span>
-                    <i className="step-dot">2</i> Add photos
-                  </span>
-                  <span>
-                    <i className="step-dot">3</i> Review &amp; submit
-                  </span>
-                </div>
-                {query.error && (
-                  <div className="notice error">
-                    Add an issue title and a short description to continue.
-                  </div>
-                )}
-                <div className="field">
-                  <label htmlFor="issueTitle">What’s the issue?</label>
-                  <input
-                    id="issueTitle"
-                    name="issueTitle"
-                    placeholder="e.g. Left earcup has stopped working"
-                    maxLength={120}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="description">Tell us a little more</label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    placeholder="Describe what happened and any troubleshooting you’ve tried…"
-                    maxLength={3000}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="issueDate">
-                    When did you first notice it?{" "}
-                    <span className="muted" style={{ fontWeight: 400 }}>
-                      (optional)
-                    </span>
-                  </label>
-                  <input id="issueDate" type="date" />
-                  <span className="muted" style={{ fontSize: 10 }}>
-                    This helps the brand understand the issue. It does not change your warranty
-                    dates.
-                  </span>
-                </div>
-                <SubmitClaimButton />
-                <p className="muted" style={{ fontSize: 10, marginTop: 14 }}>
-                  Photo upload is not enabled in this demo. No email is sent.
-                </p>
-              </form>
+              <ClaimForm sessionId={sessionId} unitId={unitId} submissionId={randomUUID()}/>
             )}
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { requireBrand } from "@/lib/brand";
-import { BrandSettingsForm } from "@/components/brand-product-form";
+import { BrandIdentityForm as BrandSettingsForm } from "@/components/brand-identity-form";
 
 export default async function SettingsPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
