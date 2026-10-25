@@ -15,10 +15,19 @@ export function DemoLauncher() {
         const view = searchParams.get("view") === "brand" ? "brand" : "customer";
         const savedSession = localStorage.getItem("vouch-demo-session");
 
+        // A saved workspace already has its route. Do not make the visitor wait for
+        // a database lookup just to navigate to it.
+        if (savedSession && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(savedSession)) {
+          const destination = localStorage.getItem("vouch-demo-has-brand") === "false" ? "setup" : view;
+          navigate(`/demo/${savedSession}/${destination}`, { replace: true });
+          return;
+        }
+        if (savedSession) localStorage.removeItem("vouch-demo-session");
+
         const response = await apiFetch("/api/demo/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: savedSession || undefined }),
+          body: JSON.stringify({}),
         });
 
         if (!response.ok) {
@@ -28,6 +37,7 @@ export function DemoLauncher() {
         const data = await response.json();
         if (data.sessionId && active) {
           localStorage.setItem("vouch-demo-session", data.sessionId);
+          localStorage.setItem("vouch-demo-has-brand", String(Boolean(data.hasBrand)));
           navigate(`/demo/${data.sessionId}/${data.hasBrand ? view : "setup"}`, { replace: true });
         }
       } catch (err: any) {

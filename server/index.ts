@@ -22,7 +22,7 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3002;
 
 app.use(cors());
 app.use(express.json({ limit: "8mb" }));
@@ -721,6 +721,31 @@ app.post("/api/demo/:sessionId/brand/settings", async (req, res) => {
 // -------------------------------------------------------------
 // CUSTOMER PORTAL APIS
 // -------------------------------------------------------------
+
+// Only the linked product and customer details are needed to open a registration link.
+// The dashboard endpoint below also loads registrations, claims and notifications.
+app.get("/api/demo/:sessionId/register/:brandSlug/:productSlug", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  try {
+    const [product, customer] = await Promise.all([
+      db.productModel.findFirst({
+        where: { slug: req.params.productSlug, brand: { slug: req.params.brandSlug, demoSessionId: sessionId } },
+        select: {
+          id: true, name: true, slug: true, imageUrl: true, warrantyMonths: true,
+          brand: { select: { name: true, slug: true, logoUrl: true } },
+        },
+      }),
+      db.customer.findFirst({ where: { demoSessionId: sessionId }, select: { name: true, email: true } }),
+    ]);
+    if (!product) return res.status(404).json({ error: "This registration link does not match an active product." });
+    const { brand, ...registrationProduct } = product;
+    res.json({ brand, product: registrationProduct, customer });
+  } catch (error: any) {
+    console.error("Registration product error:", error);
+    res.status(500).json({ error: "Could not load this product." });
+  }
+});
 
 // Customer Dashboard
 app.get("/api/demo/:sessionId/customer", async (req, res) => {

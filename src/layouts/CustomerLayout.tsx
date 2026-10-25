@@ -6,14 +6,17 @@ import { RouteTransition } from "@/components/route-transition";
 import "@/app/globals.css";
 
 export function CustomerLayout() {
-  const { sessionId } = useParams<{ sessionId: string }>();
+  const { sessionId, brandSlug, productSlug } = useParams<{ sessionId: string; brandSlug: string; productSlug: string }>();
   const [customerName, setCustomerName] = useState<string>("Customer");
   const [brandName, setBrandName] = useState<string>("");
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) return;
-    apiFetch(`/api/demo/${sessionId}/customer`)
+    const url = brandSlug && productSlug
+      ? `/api/demo/${sessionId}/register/${encodeURIComponent(brandSlug)}/${encodeURIComponent(productSlug)}`
+      : `/api/demo/${sessionId}/customer`;
+    apiFetch(url)
       .then((res) => res.json())
       .then((data) => {
         if (data.customer?.name) setCustomerName(data.customer.name);
@@ -21,7 +24,7 @@ export function CustomerLayout() {
         if (data.brand?.logoUrl) setBrandLogoUrl(data.brand.logoUrl);
       })
       .catch(() => {});
-  }, [sessionId]);
+  }, [sessionId, brandSlug, productSlug]);
 
   return (
     <div>

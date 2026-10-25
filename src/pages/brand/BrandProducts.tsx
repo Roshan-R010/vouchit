@@ -54,8 +54,8 @@ export function BrandProducts() {
           <h1>Warrantied Models</h1>
           <p>Manage product models, standard warranty periods, and stamped unit registration links.</p>
         </div>
-        <Link to={`/demo/${sessionId}/brand/products/new`} className="business-button primary">
-          <Plus size={15} /> Add product
+        <Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">
+          Add product
         </Link>
       </div>
 

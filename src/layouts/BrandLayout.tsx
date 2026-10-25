@@ -14,7 +14,7 @@ export function BrandLayout() {
     if (!sessionId) return;
     localStorage.setItem("vouch-demo-session", sessionId);
     let active = true;
-    const update = () => { void apiFetch(`/api/demo/${sessionId}/brand/settings`).then(readApiResponse).then(data => { if (active) setBrand(data.brand); }).catch(() => {}); };
+    const update = () => { void apiFetch(`/api/demo/${sessionId}/brand/settings`).then(readApiResponse).then(data => { if (active) { setBrand(data.brand); localStorage.setItem("vouch-demo-has-brand", "true"); } }).catch(() => {}); };
     update(); window.addEventListener("vouch:data-changed", update);
     return () => { active = false; window.removeEventListener("vouch:data-changed", update); };
   }, [sessionId]);

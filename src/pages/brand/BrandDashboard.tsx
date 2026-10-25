@@ -83,8 +83,8 @@ export function BrandDashboard() {
           <p>Real-time warranty registrations, claims review, and warranty aftercare health.</p>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
-          <Link to={`/demo/${sessionId}/brand/products/new`} className="business-button primary">
-            <Plus size={15} /> Add product
+          <Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">
+            Add product
           </Link>
           <Link to={`/demo/${sessionId}/customer`} className="business-button">
             Customer portal <ArrowUpRight size={14} />

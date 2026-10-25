@@ -25,6 +25,7 @@ export default function BrandSetup() {
       const response = await apiFetch(`/api/demo/${sessionId}/brand/setup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, supportEmail, logoDataUrl: logo ? await asDataUrl(logo) : undefined }) });
       const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.error || "Could not create your brand.");
+      localStorage.setItem("vouch-demo-has-brand", "true");
       navigate(`/demo/${sessionId}/brand`, { replace: true });
     } catch (cause: any) { setError(cause.message || "Could not create your brand."); }
     finally { setSaving(false); }

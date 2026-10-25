@@ -23,7 +23,7 @@ import CustomerDashboard from "./pages/customer/CustomerDashboard";
 import CustomerProductDetail from "./pages/customer/CustomerProductDetail";
 import CustomerNewClaim from "./pages/customer/CustomerNewClaim";
 import CustomerClaimDetail from "./pages/customer/CustomerClaimDetail";
-import CustomerRegister from "./pages/customer/CustomerRegister";
+import CustomerRegister from "./pages/customer/CustomerRegisterPortal";
 import CustomerProductPicker from "./pages/customer/CustomerProductPicker";
 import CustomerSupport from "./pages/customer/CustomerSupport";
 
