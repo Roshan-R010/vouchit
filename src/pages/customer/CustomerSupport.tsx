@@ -15,6 +15,7 @@ type CustomerClaim = {
   submittedAt: string;
 };
 type Warranty = {
+  demoSessionId?: string;
   unitId: string;
   productName: string;
   imageUrl: string | null;
@@ -31,7 +32,7 @@ function ClaimList({ title, description, warranties, sessionId }: { title: strin
       return <article className="support-claim-card" key={claim.id}>
         <div className="support-claim-image">{warranty.imageUrl ? <ProductPhoto src={warranty.imageUrl} alt={warranty.productName}/> : <LifeBuoy size={28}/>}</div>
         <div className="support-claim-copy"><div className="support-claim-topline"><span>{warranty.productName}</span><span>{formatDate(new Date(claim.submittedAt))}</span></div><h3>{claim.issueTitle}</h3><p>Claim {claim.reference} · Serial {warranty.serialNumber}</p></div>
-        <div className="support-claim-end"><ClaimStatusBadge status={claim.status}/><Link className="action secondary" to={`/demo/${sessionId}/customer/claims/${claim.id}`}>View claim <ArrowRight size={15}/></Link></div>
+        <div className="support-claim-end"><ClaimStatusBadge status={claim.status}/><Link className="action secondary" to={`/demo/${warranty.demoSessionId || sessionId}/customer/claims/${claim.id}`}>View claim <ArrowRight size={15}/></Link></div>
       </article>;
     })}</div>
   </section>;
@@ -42,9 +43,8 @@ export default function CustomerSupport() {
   const [warranties, setWarranties] = useState<Warranty[] | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!sessionId) return;
     let active = true;
-    apiFetch(`/api/demo/${sessionId}/customer`, { cache: "no-store" }).then(readApiResponse)
+    apiFetch(sessionId ? `/api/demo/${sessionId}/customer` : "/api/account/customer", { cache: "no-store" }).then(readApiResponse)
       .then(data => { if (active) setWarranties(data.warranties || []); })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Could not load your claims."); });
     return () => { active = false; };
@@ -57,7 +57,7 @@ export default function CustomerSupport() {
     <header className="support-header"><div><span className="eyebrow">Vouch support</span><h1>Your claims</h1><p>Follow the progress of claims you’ve submitted for your registered products.</p></div><div className="support-header-icon" aria-hidden="true"><LifeBuoy size={26}/></div></header>
     {error && <div className="notice error" role="alert">{error}</div>}
     {!warranties && !error && <p className="support-loading" role="status">Loading your claims…</p>}
-    {warranties && !claimed.length && <section className="support-empty"><LifeBuoy size={28} aria-hidden="true"/><h2>No claims yet</h2><p>If a registered product needs help, open its warranty and raise a claim. You’ll be able to track it here.</p><Link className="action" to={`/demo/${sessionId}/customer`}>View my warranties <ArrowRight size={16}/></Link></section>}
+    {warranties && !claimed.length && <section className="support-empty"><LifeBuoy size={28} aria-hidden="true"/><h2>No claims yet</h2><p>If a registered product needs help, open its warranty and raise a claim. You’ll be able to track it here.</p><Link className="action" to="/customer">View my warranties <ArrowRight size={16}/></Link></section>}
     <ClaimList title="In progress" description="Submitted, under review, or waiting for a decision." warranties={ongoing} sessionId={sessionId || ""}/>
     <ClaimList title="Claim history" description="Claims with a recorded outcome." warranties={closed} sessionId={sessionId || ""}/>
   </main>;

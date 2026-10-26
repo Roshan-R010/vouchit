@@ -92,7 +92,7 @@ export function BrandProducts() {
 
                 <div style={{ marginTop: "14px", display: "flex", gap: "8px" }}>
                   <Link to={`/demo/${sessionId}/brand/products/${p.id}`} className="business-button small" style={{ flex: 1 }}>
-                    Units & Orders
+                    Manage product
                   </Link>
                   <Link
                     to={regLink}

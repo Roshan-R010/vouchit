@@ -1,6 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { Outlet, useParams, Link } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { Outlet, useParams } from "react-router-dom";
 import { BrandNav } from "@/components/brand-nav";
 import { RouteTransition } from "@/components/route-transition";
 import { apiFetch } from "@/lib/api-fetch";
@@ -21,7 +20,7 @@ export function BrandLayout() {
   if (!sessionId) return <p>Workspace not found.</p>;
   return <div className="business-shell">
     <BrandNav sessionId={sessionId} brandName={brand?.name || "Your brand"} logoUrl={brand?.logoUrl}/>
-    <div className="business-main"><header className="business-topbar"><span><strong>{brand?.name || "Your brand"}</strong><span className="business-muted"> / Business</span></span><Link className="business-text-link" to={`/demo/${sessionId}/customer`}>Customer portal <ArrowUpRight size={17}/></Link></header><main className="business-content"><RouteTransition><Outlet/></RouteTransition></main></div>
+    <div className="business-main"><header className="business-topbar"><span><strong>{brand?.name || "Your brand"}</strong><span className="business-muted"> / Business</span></span></header><main className="business-content"><RouteTransition><Outlet/></RouteTransition></main></div>
   </div>;
 }
 export default BrandLayout;

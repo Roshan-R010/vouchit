@@ -2,7 +2,16 @@
 .claim-status{display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #dde3e9;border-radius:5px;background:#f5f7fa;color:#445164;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap}.claim-status>span{width:5px;height:5px;border-radius:50%;background:currentColor}.claim-status-under_review{color:#305887;background:#f0f5fb;border-color:#d9e5f3}.claim-status-approved,.claim-status-resolved{color:#2e6549;background:#f0f7f3;border-color:#d9e7df}.claim-status-rejected{color:#8a4141;background:#fbf4f4;border-color:#ecdcdc}.claim-status-info_requested{color:#765920;background:#faf7ee;border-color:#e9e1cc}
 button:disabled{cursor:not-allowed;opacity:.6}.business-button:focus-visible,.action:focus-visible{outline:3px solid #93b9e3;outline-offset:3px}.business-shell .business-panel{background:#fff;box-shadow:0 1px 2px #12203203}.business-shell{background:#f6f7f9}
 body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;color:#1b2229;-webkit-font-smoothing:antialiased}
-.hero{background:#f1f5f9}.customer-hero-photo{position:absolute;right:8%;top:24px;width:180px;height:250px;overflow:hidden;border-radius:12px}.hero-copy{position:relative;z-index:1}@media(max-width:800px){.customer-hero-photo{display:none}}
+.hero{background:#f1f5f9}.hero-copy{position:relative;z-index:1}
+.brand-identity-header{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;column-gap:26px;min-height:220px;padding:28px 38px;background:#f1f5f9;border-bottom:1px solid #dce3e9;color:#20303f}
+.brand-identity-mark{width:88px;height:88px;display:grid;place-items:center;overflow:hidden;border:1px solid #cfdae3;border-radius:12px;background:#e2ecf4;color:#1c384d;font-size:32px;font-weight:750}
+.brand-identity-mark img{width:100%;height:100%;object-fit:contain}
+.brand-identity-copy{min-width:0}
+.brand-identity-eyebrow{font-size:13px;font-weight:750;letter-spacing:1.4px;text-transform:uppercase;color:#536b7c}
+.brand-identity-copy h1{font:700 clamp(30px,3.2vw,46px)/1.08 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-1.7px;max-width:610px;margin:8px 0 10px}
+.brand-identity-copy p{font-size:16px;line-height:1.5;max-width:550px;color:#536575;margin:0}
+@media(max-width:800px){.brand-identity-header{grid-template-columns:76px minmax(0,1fr);gap:16px;min-height:190px;padding:22px 24px}.brand-identity-mark{width:72px;height:72px}.brand-identity-copy h1{font-size:34px}.brand-identity-copy p{font-size:15px}}
+@media(max-width:560px){.brand-identity-header{grid-template-columns:64px minmax(0,1fr);gap:12px;padding:22px 18px}.brand-identity-mark{width:60px;height:60px}.brand-identity-copy h1{font-size:30px}.brand-identity-eyebrow{font-size:11px;letter-spacing:.8px}}
 button,input,select,textarea{font-family:inherit}
 .vouch-wordmark{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:36px;letter-spacing:-1.8px;line-height:1;color:#202020;display:inline-block;white-space:nowrap}
 .vouch-wordmark .vouch-wordmark-dot{color:#ef514b}
@@ -103,6 +112,37 @@ button,input,select,textarea{font-family:inherit}
 /* Warmer, more dimensional customer warranty and claim cards */
 .product-card{background:linear-gradient(145deg,#fff 0%,#f8fafb 100%);border-color:#d9e0e5;box-shadow:0 9px 26px #1d34470a}.product-card:has(.badge:not(.expired)){border-top:3px solid #8cbba0}.support-page{position:relative}.support-page:before{content:"";position:absolute;z-index:-1;inset:0 -7vw auto;height:310px;background:linear-gradient(120deg,#edf3f7,#f7f4ef);border-radius:0 0 40px 40px}.support-header{background:rgba(255,255,255,.72);box-shadow:0 16px 40px #2033450b;backdrop-filter:blur(14px)}.support-claim-card{border-left:4px solid #6f8da3;box-shadow:0 8px 24px #2033450a;transition:transform .25s ease,box-shadow .25s ease}.support-claim-card:hover{transform:translateY(-2px);box-shadow:0 14px 32px #20334512}.support-claim-image{background:linear-gradient(145deg,#e5eef4,#c8dae7)}
 
-@media(max-width:1000px){.registration-portal{padding:54px 32px}.registration-intro{width:390px}.registration-drawer{top:30px;right:30px;bottom:30px;width:65%;grid-template-columns:1fr}.registration-showcase{display:none}}
-@media(max-width:720px){.registration-portal{width:calc(100% - 20px);min-height:calc(100vh - 78px);margin:10px auto 28px;padding:35px 22px;border-radius:18px}.registration-back{margin-bottom:45px}.registration-intro h1{font-size:48px}.registration-intro>p{font-size:16px}.registration-product-card{width:100%}.registration-product-image{height:245px}.registration-drawer{position:fixed;inset:62px 10px 10px;width:auto;border-radius:16px;grid-template-columns:1fr}.registration-form-panel{padding:55px 22px 26px}.registration-form-panel h2{font-size:27px}.panel-is-open:before{content:"";position:fixed;z-index:4;inset:0;background:#1023345c;backdrop-filter:blur(3px)}}
+.registration-portal{padding:40px 5vw}
+.registration-back{margin-bottom:28px}
+.registration-intro h1{font-size:clamp(38px,4vw,54px);letter-spacing:-2px;margin:12px 0}
+.registration-intro>p{font-size:16px;margin-bottom:20px}
+.registration-product-card{width:260px;max-width:100%}
+.registration-product-image{height:190px}
+.registration-product-card-copy{padding:16px 62px 16px 18px}
+.registration-product-card-copy strong{font-size:22px}
+.registration-product-card-copy span{font-size:14px}
+.registration-card-arrow{width:38px;height:38px;right:16px;bottom:20px}
+.registration-drawer{overflow-y:auto;align-items:start;overscroll-behavior:contain}
+.registration-showcase{align-self:stretch}
+.registration-showcase-image{height:clamp(180px,28vh,260px);min-height:0;flex-shrink:0}
+.registration-showcase-copy{flex-shrink:0}
+.registration-form-panel{overflow:visible;min-width:0}
+.issue-tag-hint,.claim-issue-tags>p{font-size:14px;line-height:1.55;color:#596878;margin:0 0 10px}
+.issue-tag-list{display:flex;flex-wrap:wrap;gap:8px}
+.issue-tag{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;background:#edf2f5;border:1px solid #d5dfe6;border-radius:5px;font-size:14px;font-weight:600;color:#243e52;overflow-wrap:anywhere;max-width:100%}
+.issue-tag>button{border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:3px;cursor:pointer}
+.issue-tag>button:focus-visible{outline:2px solid #426884;outline-offset:2px}
+.issue-tag-input{display:flex;gap:10px;margin-top:8px}
+.issue-tag-input input{min-width:0;flex:1}
+.issue-tag-error{font-size:14px;color:#a43b32;margin:8px 0}
+.issue-tag-save{display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:14px;color:#345942}
+.claim-issue-tags{border:0;padding:0;margin:0 0 24px;min-width:0}
+.claim-issue-tags legend{font-size:16px;font-weight:700;margin-bottom:8px;color:#203445}
+.issue-tag-option{display:inline-flex;align-items:center;gap:9px;padding:11px 14px;border:1px solid #cbd5dd;background:#fff;border-radius:5px;font-size:15px;color:#344c5f;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+.issue-tag-option.selected{background:#eaf1f6;border-color:#294b64;color:#183b55}
+.issue-tag-option input{accent-color:#203e54;width:16px;height:16px;flex-shrink:0}
+.issue-tag-option:focus-within{outline:2px solid #597e9a;outline-offset:2px}
+.claim-selected-tags{margin:18px 0}.claim-selected-tags h3{font-size:14px;font-weight:700;margin:0 0 8px}
+@media(max-width:1000px){.registration-portal{padding:36px 32px}.registration-intro{width:min(390px,100%)}.registration-drawer{top:30px;right:30px;bottom:30px;width:65%;grid-template-columns:1fr}.registration-showcase{display:none}}
+@media(max-width:720px){.registration-portal{width:calc(100% - 20px);min-height:calc(100vh - 78px);margin:10px auto 28px;padding:28px 22px;border-radius:18px}.registration-back{margin-bottom:24px}.registration-intro h1{font-size:40px}.registration-intro>p{font-size:16px;margin-bottom:18px}.registration-product-card{width:min(260px,100%)}.registration-product-image{height:180px}.registration-drawer{position:fixed;inset:62px 10px 10px;width:auto;border-radius:16px;grid-template-columns:1fr}.registration-form-panel{padding:55px 22px 26px}.registration-form-panel h2{font-size:27px}.panel-is-open:before{content:"";position:fixed;z-index:4;inset:0;background:#1023345c;backdrop-filter:blur(3px)}}
 @media(prefers-reduced-motion:reduce){.registration-card-arrow,.registration-submit,.support-claim-card{transition:none!important}}

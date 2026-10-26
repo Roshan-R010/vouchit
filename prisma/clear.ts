@@ -8,12 +8,13 @@ async function clear() {
     db.demoSession.findMany({ select: { id: true } }),
   ]);
   const result = await db.demoSession.deleteMany();
+  const accounts = await db.account.deleteMany();
   await Promise.all([
     ...products.map(({ imageUrl }) => imageUrl && removeNewProductImage(imageUrl)),
     ...brands.map(({ logoUrl }) => logoUrl && removeNewProductImage(logoUrl)),
     ...sessions.map(({ id }) => removeSessionImages(id)),
   ]);
-  console.log(`Cleared ${result.count} demo workspace(s) and uploaded images.`);
+  console.log(`Cleared ${result.count} workspace(s), ${accounts.count} account(s), and uploaded images.`);
 }
 
 clear().catch((error) => {

@@ -160,6 +160,7 @@ export function BrandClaimDetail() {
             </div>
             <div style={{ padding: "20px 22px", fontSize: "15px", lineHeight: "1.7", color: "#373e35" }}>
               <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{claim.description}</p>
+              {claim.issueTags?.length > 0 && <div className="claim-selected-tags"><h3>Reported issues</h3><div className="issue-tag-list">{claim.issueTags.map((tag: string) => <span className="issue-tag" key={tag}>{tag}</span>)}</div></div>}
             </div>
           </div>
 

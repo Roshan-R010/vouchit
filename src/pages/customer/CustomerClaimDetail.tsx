@@ -89,7 +89,7 @@ export function CustomerClaimDetail() {
     <main className="page-wrap form-shell" style={{ margin: "30px auto" }}>
       <div className="tracking-head">
         <div>
-          <Link to={`/demo/${sessionId}/customer`} className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
+          <Link to="/customer" className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
             <ArrowLeft size={14} /> Back to dashboard
           </Link>
           <h1>{claim.issueTitle}</h1>
@@ -157,6 +157,7 @@ export function CustomerClaimDetail() {
       {/* Claim Summary & History */}
       <div className="claim-info">
         <h3>Claim Particulars</h3>
+        {claim.issueTags?.length > 0 && <div className="claim-selected-tags"><h3>Reported issues</h3><div className="issue-tag-list">{claim.issueTags.map((tag: string) => <span className="issue-tag" key={tag}>{tag}</span>)}</div></div>}
         <div className="info-row">
           <span>Product</span>
           <span>{unit.productModel.name}</span>

@@ -1,11 +1,13 @@
 import { loadAnalytics } from "./analytics";
+import { IssueTagValidationError, normalizeIssueTags, selectProductIssueTags } from "../src/lib/issue-tags";
 import express from "express";
 import cors from "cors";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { File } from "node:buffer";
-import { ActorRole, ClaimStatus, NotificationType, Prisma, ResolutionMethod } from "@prisma/client";
+import { AccountRole, ActorRole, ClaimStatus, NotificationType, Prisma, ResolutionMethod } from "@prisma/client";
+import { currentAccount, endSession, hashPassword, startSession, verifyPassword } from "./auth";
 import { db } from "../src/lib/db";
 import { requireBrand, isUuid } from "../src/lib/brand";
 import { createDemoSession, resetDemoSession, sessionCustomer } from "../src/lib/demo";
@@ -27,6 +29,105 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3002;
 app.use(cors());
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+app.get("/api/auth/me", async (req, res) => {
+  const account = await currentAccount(req);
+  res.json({ account: account && { id: account.id, role: account.role, displayName: account.displayName, demoSessionId: account.demoSessionId } });
+});
+
+app.post("/api/auth/signup", async (req, res) => {
+  const role = req.body?.role === "BRAND" ? AccountRole.BRAND : req.body?.role === "CUSTOMER" ? AccountRole.CUSTOMER : null;
+  const username = String(req.body?.username || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  const displayName = String(req.body?.displayName || "").trim();
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!role || !/^[a-z0-9_.-]{3,32}$/.test(username) || password.length < 8 || password.length > 128 || !displayName || displayName.length > 100 || (role === AccountRole.CUSTOMER && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return res.status(400).json({ error: "Enter a name, a valid username (3–32 characters), a password of at least 8 characters, and an email for customer accounts." });
+  }
+  try {
+    const passwordHash = await hashPassword(password);
+    const account = await db.$transaction(async tx => {
+      const workspace = role === AccountRole.BRAND ? await tx.demoSession.create({ data: {} }) : null;
+      return tx.account.create({ data: { username, passwordHash, role, displayName, email: role === AccountRole.CUSTOMER ? email : null, demoSessionId: workspace?.id } });
+    });
+    await startSession(account.id, res);
+    res.status(201).json({ account: { id: account.id, role, displayName, demoSessionId: account.demoSessionId } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return res.status(409).json({ error: "This username or email is already in use." });
+    console.error("Sign up failed:", error);
+    res.status(500).json({ error: "Could not create account." });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const username = String(req.body?.username || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  const role = req.body?.role;
+  try {
+    const account = await db.account.findUnique({ where: { username } });
+    if (!account || account.role !== role || !await verifyPassword(password, account.passwordHash)) return res.status(401).json({ error: "Incorrect username or password." });
+    await startSession(account.id, res);
+    const hasBrand = account.demoSessionId ? await db.brand.count({ where: { demoSessionId: account.demoSessionId } }) > 0 : false;
+    res.json({ account: { id: account.id, role: account.role, displayName: account.displayName, demoSessionId: account.demoSessionId }, hasBrand });
+  } catch (error) {
+    console.error("Login failed:", error);
+    res.status(500).json({ error: "Could not sign in." });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => { await endSession(req, res); res.json({ success: true }); });
+
+app.get("/api/account/customer", async (req, res) => {
+  const account = await currentAccount(req);
+  if (!account || account.role !== AccountRole.CUSTOMER) return res.status(401).json({ error: "Please sign in as a customer." });
+  try {
+    const registrations = await db.warrantyRegistration.findMany({
+      where: { customer: { accountId: account.id } },
+      include: { unit: { include: { productModel: true, purchaseOrder: true, brand: true } }, claim: true },
+      orderBy: { registeredAt: "desc" },
+    });
+    res.json({
+      customer: { name: account.displayName, email: account.email },
+      brand: { name: "Vouch", slug: "", logoUrl: null },
+      availableProducts: [],
+      warranties: registrations.map(r => {
+        const remainingDays = daysRemaining(r.coverageEndsOn);
+        return {
+          registrationId: r.id, unitId: r.unitId, demoSessionId: r.unit.brand.demoSessionId,
+          productModelId: r.unit.productModelId, serialNumber: r.unit.serialNumber,
+          productName: r.unit.productModel.name, imageUrl: r.unit.productModel.imageUrl,
+          brandName: r.unit.brand.name, warrantyMonths: r.unit.productModel.warrantyMonths,
+          coverageStartsOn: r.coverageStartsOn, coverageEndsOn: r.coverageEndsOn,
+          isActive: isCoverageActive(r.coverageEndsOn), daysRemaining: remainingDays,
+          progressPercent: Math.max(0, Math.min(100, Math.round(remainingDays / (r.unit.productModel.warrantyMonths * 30.5) * 100))),
+          orderNumber: r.unit.purchaseOrder.orderNumber, deliveredOn: r.unit.purchaseOrder.deliveredOn,
+          claim: r.claim ? { id: r.claim.id, reference: r.claim.reference, status: r.claim.status, issueTitle: r.claim.issueTitle, submittedAt: r.claim.submittedAt } : null,
+        };
+      }),
+      notifications: [],
+    });
+  } catch (error) {
+    console.error("Customer account error:", error);
+    res.status(500).json({ error: "Could not load your warranties." });
+  }
+});
+
+// The product page is public so a shared link opens before login. Every account
+// view and write below this point is scoped to the authenticated role and owner.
+app.use("/api/demo/:sessionId", async (req, res, next) => {
+  if (req.method === "GET" && /^\/register\/[^/]+\/[^/]+$/.test(req.path)) return next();
+  const account = await currentAccount(req);
+  if (!account) return res.status(401).json({ error: "Please sign in to continue." });
+  if (req.path.startsWith("/brand") || req.path === "/reset") {
+    if (account.role !== AccountRole.BRAND || account.demoSessionId !== req.params.sessionId) return res.status(403).json({ error: "This brand workspace is not yours." });
+  } else if (req.path.startsWith("/customer") || req.path === "/register") {
+    if (account.role !== AccountRole.CUSTOMER) return res.status(403).json({ error: "Please use a customer account." });
+  } else if (req.path === "/session") {
+    return res.status(403).json({ error: "Use your account to open a workspace." });
+  }
+  res.locals.account = account;
+  next();
+});
 
 // Helper: safe session ID validation
 function checkSessionId(req: express.Request, res: express.Response): string | null {
@@ -526,6 +627,24 @@ app.post("/api/demo/:sessionId/brand/products/:productId/units", async (req, res
   }
 });
 
+// Brand Product Issue Tags
+app.patch("/api/demo/:sessionId/brand/products/:productId/issue-tags", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  if (!isUuid(req.params.productId)) return res.status(400).json({ error: "Invalid product ID." });
+  try {
+    const issueTags = normalizeIssueTags(req.body?.issueTags);
+    const updated = await db.productModel.updateMany({
+      where: { id: req.params.productId, brand: { demoSessionId: sessionId } },
+      data: { issueTags },
+    });
+    if (!updated.count) return res.status(404).json({ error: "Product not found in this workspace." });
+    res.json({ issueTags });
+  } catch (error) {
+    res.status(error instanceof IssueTagValidationError ? 400 : 500).json({ error: error instanceof IssueTagValidationError ? error.message : "Could not save issue tags." });
+  }
+});
+
 // Brand Create Product
 app.post("/api/demo/:sessionId/brand/products", async (req, res) => {
   const sessionId = checkSessionId(req, res);
@@ -533,6 +652,7 @@ app.post("/api/demo/:sessionId/brand/products", async (req, res) => {
   try {
     const brand = await requireBrand(sessionId);
     const { name, sku, warrantyMonths, serialNumber, orderNumber, deliveredOn } = req.body;
+    const issueTags = normalizeIssueTags(req.body.issueTags === undefined ? [] : req.body.issueTags);
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({ error: "Product name is required." });
@@ -567,6 +687,7 @@ app.post("/api/demo/:sessionId/brand/products", async (req, res) => {
           sku: sku ? String(sku).trim() : null,
           warrantyMonths: duration,
           imageUrl: uploadedImage,
+          issueTags,
         },
       });
 
@@ -728,19 +849,16 @@ app.get("/api/demo/:sessionId/register/:brandSlug/:productSlug", async (req, res
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
   try {
-    const [product, customer] = await Promise.all([
-      db.productModel.findFirst({
+    const product = await db.productModel.findFirst({
         where: { slug: req.params.productSlug, brand: { slug: req.params.brandSlug, demoSessionId: sessionId } },
         select: {
           id: true, name: true, slug: true, imageUrl: true, warrantyMonths: true,
           brand: { select: { name: true, slug: true, logoUrl: true } },
         },
-      }),
-      db.customer.findFirst({ where: { demoSessionId: sessionId }, select: { name: true, email: true } }),
-    ]);
+      });
     if (!product) return res.status(404).json({ error: "This registration link does not match an active product." });
     const { brand, ...registrationProduct } = product;
-    res.json({ brand, product: registrationProduct, customer });
+    res.json({ brand, product: registrationProduct });
   } catch (error: any) {
     console.error("Registration product error:", error);
     res.status(500).json({ error: "Could not load this product." });
@@ -753,7 +871,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
   if (!sessionId) return;
   try {
     const [customer, workspaceBrand] = await Promise.all([
-      db.customer.findFirst({ where: { demoSessionId: sessionId } }),
+      db.customer.findFirst({ where: { demoSessionId: sessionId, accountId: res.locals.account.id } }),
       db.brand.findFirst({ where: { demoSessionId: sessionId }, include: { products: { select: { id: true, name: true, slug: true, imageUrl: true, warrantyMonths: true }, orderBy: { name: "asc" } } } }),
     ]);
     if (!customer) {
@@ -770,7 +888,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
     });
 
     const notifications = await db.demoNotification.findMany({
-      where: { demoSessionId: sessionId },
+      where: { demoSessionId: sessionId, recipientLabel: "Customer", relatedId: { in: registrations.map(r => r.id) } },
       orderBy: { createdAt: "desc" },
       take: 10,
     });
@@ -832,7 +950,7 @@ app.get("/api/demo/:sessionId/customer/products/:unitId", async (req, res) => {
   const { unitId } = req.params;
   try {
     const registration = await db.warrantyRegistration.findFirst({
-      where: { unitId, customer: { demoSessionId: sessionId } },
+      where: { unitId, customer: { demoSessionId: sessionId, accountId: res.locals.account.id } },
       include: {
         unit: { include: { productModel: true, purchaseOrder: true, brand: true } },
         claim: true,
@@ -859,7 +977,7 @@ app.get("/api/demo/:sessionId/customer/claims/:claimId", async (req, res) => {
     const claim = await db.warrantyClaim.findFirst({
       where: {
         id: claimId,
-        registration: { customer: { demoSessionId: sessionId } },
+        registration: { customer: { demoSessionId: sessionId, accountId: res.locals.account.id } },
       },
       include: {
         registration: {
@@ -897,7 +1015,7 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
 
   try {
     const registration = await db.warrantyRegistration.findFirst({
-      where: { unitId, customer: { demoSessionId: sessionId }, unit: { brand: { demoSessionId: sessionId } } },
+      where: { unitId, customer: { demoSessionId: sessionId, accountId: res.locals.account.id }, unit: { brand: { demoSessionId: sessionId } } },
       include: { claim: { select: { id: true } }, unit: { include: { productModel: true, brand: true, purchaseOrder: true } }, customer: true },
     });
 
@@ -912,6 +1030,7 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
     }
 
     const reference = `VCH-${submissionId.replaceAll("-", "").toUpperCase()}`;
+    const issueTags = selectProductIssueTags(req.body.issueTags === undefined ? [] : req.body.issueTags, registration.unit.productModel.issueTags);
 
     const claim = await db.$transaction(async (tx) => {
       const created = await tx.warrantyClaim.create({
@@ -921,6 +1040,7 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
           reference,
           issueTitle: String(issueTitle).trim(),
           description: String(description).trim(),
+          issueTags,
           status: ClaimStatus.SUBMITTED,
         },
       });
@@ -961,9 +1081,10 @@ app.post("/api/demo/:sessionId/customer/claims", async (req, res) => {
     res.json({ success: true, claimId: claim.id, reference: claim.reference });
   } catch (error: any) {
     // Concurrent submissions hit the database's unique registration constraint.
+    if (error instanceof IssueTagValidationError) return res.status(400).json({ error: error.message });
     // Return the existing claim rather than leaking an error or creating another.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const existing = await db.warrantyClaim.findFirst({ where: { registration: { unitId, customer: { demoSessionId: sessionId }, unit: { brand: { demoSessionId: sessionId } } } }, select: { id: true } });
+      const existing = await db.warrantyClaim.findFirst({ where: { registration: { unitId, customer: { demoSessionId: sessionId, accountId: res.locals.account.id }, unit: { brand: { demoSessionId: sessionId } } } }, select: { id: true } });
       if (existing) return res.json({ success: true, claimId: existing.id, alreadyExists: true });
     }
     res.status(400).json({ error: "Your claim could not be submitted. Please try again." });
@@ -983,7 +1104,7 @@ app.post("/api/demo/:sessionId/customer/claims/:claimId/reply", async (req, res)
   }
 
   try {
-    const scope = { id: claimId, registration: { customer: { demoSessionId: sessionId } } };
+    const scope = { id: claimId, registration: { customer: { demoSessionId: sessionId, accountId: res.locals.account.id } } };
     await db.$transaction(async (tx) => {
       const claim = await tx.warrantyClaim.findFirst({ where: scope });
       if (!claim) throw new Error("Claim not found.");
@@ -1025,18 +1146,18 @@ app.post("/api/demo/:sessionId/customer/claims/:claimId/reply", async (req, res)
 app.post("/api/demo/:sessionId/register", async (req, res) => {
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
-  const { brandSlug, productSlug, serialNumber, customerName, email } = req.body;
+  const { brandSlug, productSlug, serialNumber } = req.body;
 
   const cleanSerial = String(serialNumber || "").trim().toUpperCase();
-  const cleanEmail = String(email || "").trim();
-  const cleanName = String(customerName || "").trim();
+  const cleanEmail = res.locals.account.email as string;
+  const cleanName = res.locals.account.displayName as string;
 
   if (!cleanSerial || !cleanName || !cleanEmail) {
     return res.status(400).json({ error: "Missing required registration fields." });
   }
 
   try {
-    const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId, email: cleanEmail } });
+    const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId, accountId: res.locals.account.id } });
     const unit = await db.productUnit.findFirst({
       where: {
         serialNumber: cleanSerial,
@@ -1051,6 +1172,7 @@ app.post("/api/demo/:sessionId/register", async (req, res) => {
     }
 
     if (unit.registration) {
+      if (unit.registration.customerId !== customer?.id) return res.status(409).json({ error: "This serial number is registered to another customer." });
       return res.json({ success: true, unitId: unit.id, alreadyRegistered: true });
     }
 
@@ -1063,7 +1185,7 @@ app.post("/api/demo/:sessionId/register", async (req, res) => {
     const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
 
     const reg = await db.$transaction(async (tx) => {
-      const registeredCustomer = customer ?? await tx.customer.create({ data: { demoSessionId: sessionId, name: cleanName, email: cleanEmail } });
+      const registeredCustomer = customer ?? await tx.customer.create({ data: { demoSessionId: sessionId, accountId: res.locals.account.id, name: cleanName, email: cleanEmail } });
       if (customer) await tx.customer.update({ where: { id: customer.id }, data: { name: cleanName, email: cleanEmail } });
       const created = await tx.warrantyRegistration.create({
         data: {

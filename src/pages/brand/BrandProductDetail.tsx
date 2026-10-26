@@ -1,4 +1,5 @@
 import { AddProductUnit } from "@/components/add-product-unit";
+import { ProductIssueTags } from "@/components/product-issue-tags";
 import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useState } from "react";
@@ -91,6 +92,7 @@ export function BrandProductDetail() {
         </div>
       </div>
 
+      {sessionId && productId && <ProductIssueTags key={productId} sessionId={sessionId} productId={productId} initialTags={product.issueTags || []}/>}
       {sessionId && productId && <AddProductUnit sessionId={sessionId} productId={productId} onSaved={() => setVersion(value => value + 1)}/>}
       {/* Units Table */}
       <div className="business-panel">

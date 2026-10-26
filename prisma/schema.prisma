@@ -33,6 +33,33 @@ enum NotificationType {
   CLAIM_SUBMITTED_BRAND
 }
 
+enum AccountRole {
+  BRAND
+  CUSTOMER
+}
+
+model Account {
+  id           String        @id @default(uuid()) @db.Uuid
+  username     String        @unique
+  passwordHash String
+  role         AccountRole
+  displayName  String
+  email        String?       @unique
+  demoSessionId String?      @unique @db.Uuid
+  createdAt    DateTime      @default(now())
+  sessions     AuthSession[]
+  customers    Customer[]
+}
+
+model AuthSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  accountId String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+}
+
 model DemoSession {
   id            String             @id @default(uuid()) @db.Uuid
   createdAt     DateTime           @default(now())
@@ -64,6 +91,7 @@ model ProductModel {
   sku            String?
   imageUrl       String?
   warrantyMonths Int          @default(36)
+  issueTags      String[]     @default([])
   brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
   units          ProductUnit[]
   @@unique([brandId, slug])
@@ -74,10 +102,13 @@ model Customer {
   demoSessionId String                @db.Uuid
   name          String
   email         String
+  accountId     String?               @db.Uuid
+  account       Account?              @relation(fields: [accountId], references: [id], onDelete: SetNull)
   demoSession   DemoSession           @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
   orders        PurchaseOrder[]
   registrations WarrantyRegistration[]
   @@unique([demoSessionId, email])
+  @@index([accountId])
 }
 
 model PurchaseOrder {
@@ -125,6 +156,7 @@ model WarrantyClaim {
   reference      String              @unique
   issueTitle     String
   description    String
+  issueTags      String[]             @default([])
   status         ClaimStatus         @default(SUBMITTED)
   submittedAt    DateTime            @default(now())
   resolutionMethod ResolutionMethod?

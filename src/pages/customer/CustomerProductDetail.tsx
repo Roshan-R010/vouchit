@@ -48,7 +48,7 @@ export function CustomerProductDetail() {
   return (
     <main className="page-wrap form-shell" style={{ margin: "30px auto" }}>
       <div className="form-header">
-        <Link to={`/demo/${sessionId}/customer`} className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
+        <Link to="/customer" className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
         <h1>{unit.productModel.name}</h1>

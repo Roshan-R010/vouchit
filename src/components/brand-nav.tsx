@@ -4,12 +4,16 @@ import { prefetchApi } from "@/lib/api-fetch";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, Package, Users, ClipboardList, BarChart2, Settings, ArrowUpRight, RotateCcw } from "lucide-react";
+import { LayoutDashboard, Inbox, Package, Users, ClipboardList, BarChart2, Settings } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { useAuth } from "@/lib/auth-context";
+import { useNavigate } from "react-router-dom";
 
 export function BrandNav({ sessionId, brandName, logoUrl }: { sessionId: string; brandName: string; logoUrl?: string | null }) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
   const base = `/demo/${sessionId}/brand`;
   const links = [
     { title: "Dashboard", href: base, icon: LayoutDashboard },
@@ -30,6 +34,6 @@ export function BrandNav({ sessionId, brandName, logoUrl }: { sessionId: string;
         <Icon size={17} /><span>{title}</span>
       </Link>;
     })}</nav>
-    <div className="business-sidebar-bottom"><Link className={`business-nav-link ${pathname.endsWith("/settings") ? "active" : ""}`} href={`${base}/settings`}><Settings size={17}/>Settings</Link><Link className="business-nav-link" href={`/demo/${sessionId}/customer`}><ArrowUpRight size={17}/>Customer view</Link><form action={`/demo/${sessionId}/reset`} method="post" onSubmit={(event) => { if (!window.confirm("Clear this workspace? This permanently removes the brand, products, units, registrations and claims.")) event.preventDefault(); }}><button type="submit" className="business-nav-link"><RotateCcw size={16}/>Clear workspace</button></form></div>
+    <div className="business-sidebar-bottom"><Link className={`business-nav-link ${pathname.endsWith("/settings") ? "active" : ""}`} href={`${base}/settings`}><Settings size={17}/>Settings</Link><button type="button" className="business-nav-link" onClick={() => { void signOut().then(() => navigate("/")); }}>Sign out</button></div>
   </aside>;
 }

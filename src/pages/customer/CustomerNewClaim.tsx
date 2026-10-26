@@ -19,13 +19,16 @@ export function CustomerNewClaim() {
   const submittingRef = useRef(false);
   const [checking, setChecking] = useState(true);
   const [canSubmit, setCanSubmit] = useState(false);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [issueTags, setIssueTags] = useState<string[]>([]);
   useEffect(() => {
     let active = true;
+    setChecking(true); setCanSubmit(false); setAvailableTags([]); setIssueTags([]);
     if (!unitId) { setError("Choose a registered product from your dashboard to start a claim."); setChecking(false); return; }
     apiFetch(`/api/demo/${sessionId}/customer/products/${unitId}`).then(readApiResponse).then(data => {
       if (!active) return;
       if (data.registration.claim) navigate(`/demo/${sessionId}/customer/claims/${data.registration.claim.id}`, { replace: true });
-      else { setCanSubmit(true); setChecking(false); }
+      else { setAvailableTags(data.registration.unit.productModel.issueTags || []); setCanSubmit(true); setChecking(false); }
     }).catch(cause => { if (active) { setError(cause.message); setChecking(false); } });
     return () => { active = false; };
   }, [sessionId, unitId, navigate]);
@@ -41,7 +44,7 @@ export function CustomerNewClaim() {
       const response = await apiFetch(`/api/demo/${sessionId}/customer/claims`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unitId, issueTitle, description, submissionId }),
+        body: JSON.stringify({ unitId, issueTitle, description, submissionId, issueTags }),
       });
 
       const data = await readApiResponse(response);
@@ -61,7 +64,7 @@ export function CustomerNewClaim() {
   return (
     <main className="page-wrap form-shell" style={{ margin: "30px auto" }}>
       <div className="form-header">
-        <Link to={`/demo/${sessionId}/customer`} className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
+        <Link to="/customer" className="reset-link" style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
         <h1>Submit a warranty claim</h1>
@@ -72,6 +75,13 @@ export function CustomerNewClaim() {
         {error && <div className="notice error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
+          {availableTags.length > 0 && <fieldset className="claim-issue-tags" disabled={submitting || checking}>
+            <legend>Which issues match your problem?</legend>
+            <p>Select all that apply. If none match, describe the issue below.</p>
+            <div className="issue-tag-list">{availableTags.map(tag => <label className={`issue-tag-option ${issueTags.includes(tag) ? "selected" : ""}`} key={tag}>
+              <input type="checkbox" checked={issueTags.includes(tag)} onChange={event => setIssueTags(current => event.target.checked ? [...current, tag] : current.filter(item => item !== tag))}/><span>{tag}</span>
+            </label>)}</div>
+          </fieldset>}
           <div className="field">
             <label htmlFor="claim-summary">Issue summary</label>
             <input

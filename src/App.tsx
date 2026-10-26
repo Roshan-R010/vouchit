@@ -1,7 +1,8 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import LandingPage from "./pages/LandingPage";
-import DemoLauncher from "./pages/DemoLauncher";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/lib/auth-context";
+import EntryPage from "./pages/EntryPage";
+import LoginPage from "./pages/LoginPage";
 import BrandSetup from "./pages/BrandSetup";
 
 // Brand Layout & Pages
@@ -24,21 +25,30 @@ import CustomerProductDetail from "./pages/customer/CustomerProductDetail";
 import CustomerNewClaim from "./pages/customer/CustomerNewClaim";
 import CustomerClaimDetail from "./pages/customer/CustomerClaimDetail";
 import CustomerRegister from "./pages/customer/CustomerRegisterPortal";
-import CustomerProductPicker from "./pages/customer/CustomerProductPicker";
 import CustomerSupport from "./pages/customer/CustomerSupport";
+
+function RequireRole({ role, children }: { role: "BRAND" | "CUSTOMER"; children: React.ReactNode }) {
+  const { account, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <main className="auth-page"><p>Opening your account…</p></main>;
+  if (!account || account.role !== role) return <Navigate to={`/login/${role.toLowerCase()}?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  if (role === "BRAND" && account.demoSessionId !== location.pathname.split("/")[2]) return <Navigate to={`/demo/${account.demoSessionId}/brand`} replace />;
+  return <>{children}</>;
+}
 
 export function App() {
   return (
     <Routes>
       {/* Landing page */}
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<EntryPage />} />
+      <Route path="/login/:role" element={<LoginPage />} />
 
       {/* Demo launcher / session resolver */}
-      <Route path="/demo" element={<DemoLauncher />} />
-      <Route path="/demo/:sessionId/setup" element={<BrandSetup />} />
+      <Route path="/demo" element={<Navigate to="/" replace />} />
+      <Route path="/demo/:sessionId/setup" element={<RequireRole role="BRAND"><BrandSetup /></RequireRole>} />
 
       {/* Brand Workspace Routes */}
-      <Route path="/demo/:sessionId/brand" element={<BrandLayout />}>
+      <Route path="/demo/:sessionId/brand" element={<RequireRole role="BRAND"><BrandLayout /></RequireRole>}>
         <Route index element={<BrandDashboard />} />
         <Route path="claims" element={<BrandClaims />} />
         <Route path="claims/:claimId" element={<BrandClaimDetail />} />
@@ -52,9 +62,12 @@ export function App() {
       </Route>
 
       {/* Customer Portal Routes */}
-      <Route path="/demo/:sessionId/customer" element={<CustomerLayout />}>
+      <Route path="/customer" element={<RequireRole role="CUSTOMER"><CustomerLayout /></RequireRole>}>
         <Route index element={<CustomerDashboard />} />
-        <Route path="register" element={<CustomerProductPicker />} />
+        <Route path="claims" element={<CustomerSupport />} />
+      </Route>
+      <Route path="/demo/:sessionId/customer" element={<RequireRole role="CUSTOMER"><CustomerLayout /></RequireRole>}>
+        <Route index element={<CustomerDashboard />} />
         <Route path="products/:unitId" element={<CustomerProductDetail />} />
         <Route path="claims" element={<CustomerSupport />} />
         <Route path="claims/new" element={<CustomerNewClaim />} />

@@ -3,10 +3,12 @@ import React, { useEffect, useState } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { CustomerNav } from "@/components/customer-nav";
 import { RouteTransition } from "@/components/route-transition";
+import { useAuth } from "@/lib/auth-context";
 import "@/app/globals.css";
 
 export function CustomerLayout() {
   const { sessionId, brandSlug, productSlug } = useParams<{ sessionId: string; brandSlug: string; productSlug: string }>();
+  const { account } = useAuth();
   const [customerName, setCustomerName] = useState<string>("Customer");
   const [brandName, setBrandName] = useState<string>("");
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function CustomerLayout() {
 
   return (
     <div>
-      <CustomerNav sessionId={sessionId} customerName={customerName} brandName={brandName || undefined} brandLogoUrl={brandLogoUrl} />
+      <CustomerNav sessionId={sessionId} customerName={account?.role === "CUSTOMER" ? account.displayName : customerName} brandName={brandName || undefined} brandLogoUrl={brandLogoUrl} />
       <RouteTransition>
         <Outlet />
       </RouteTransition>

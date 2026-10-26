@@ -3,6 +3,7 @@ import { readApiResponse } from "@/lib/api-response";
 import React, { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { IssueTagEditor } from "@/components/issue-tag-editor";
 
 export function BrandNewProduct() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -15,6 +16,7 @@ export function BrandNewProduct() {
   const [orderNumber, setOrderNumber] = useState("");
   const [deliveredOn, setDeliveredOn] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [issueTags, setIssueTags] = useState<string[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export function BrandNewProduct() {
           name,
           sku,
           warrantyMonths,
+          issueTags,
           serialNumber: serialNumber || undefined,
           orderNumber: orderNumber || undefined,
           deliveredOn: deliveredOn || undefined,
@@ -110,6 +113,8 @@ export function BrandNewProduct() {
               />
             </div>
           </div>
+
+          <IssueTagEditor value={issueTags} onChange={setIssueTags} disabled={submitting}/>
 
           <details className="business-details" open>
             <summary>Add a delivered unit and order (optional)</summary>
