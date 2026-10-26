@@ -1,221 +1,94 @@
-import { ClaimStatusBadge } from "@/components/claim-status-badge";
-import { apiFetch } from "@/lib/api-fetch";
-import { RegistrationChart } from "@/components/registration-chart";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowUpRight, Plus, Inbox, Package, Users, ShieldCheck, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, ClipboardList, Clock3, Inbox, Package, ShieldCheck } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
+import { readApiResponse } from "@/lib/api-response";
 import { formatDate } from "@/lib/dates";
+import { ProductPhoto } from "@/components/product-photo";
+import { RegistrationChart } from "@/components/registration-chart";
+import styles from "./brand-dashboard.module.css";
 
-const claimStatusLabel: Record<string, string> = {
-  SUBMITTED: "New",
-  UNDER_REVIEW: "In review",
-  INFO_REQUESTED: "Needs info",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-  RESOLVED: "Resolved",
+type DashboardData = {
+  brand: { name: string };
+  periodDays: number;
+  metrics: { totalRegistrations: number; openClaimsCount: number; needsReviewCount: number; productsCount: number; expiringSoonCount: number; missingDetailsCount: number };
+  chartData: { label: string; count: number }[];
+  recentRegistrations: { id: string; registeredAt: string; customer: { name: string; email: string }; unit: { serialNumber: string; productModel: { id: string; name: string; imageUrl: string | null } } }[];
 };
 
-function claimBadgeStyle(status: string): React.CSSProperties {
-  if (status === "SUBMITTED") return { background: "#edf1f9", color: "#4f6798" };
-  if (status === "UNDER_REVIEW") return { background: "#fbf2df", color: "#917036" };
-  if (status === "RESOLVED" || status === "APPROVED") return { background: "#eaf4e9", color: "#4e8050" };
-  if (status === "REJECTED") return { background: "#faece9", color: "#a5655d" };
-  return { background: "#f0f2ed", color: "#737d69" };
-}
-
 export function BrandDashboard() {
-  const { sessionId } = useParams<{ sessionId: string }>();
-  const [data, setData] = useState<any>(null);
+  const { sessionId } = useParams();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [period, setPeriod] = useState<30 | 90>(30);
   const [loading, setLoading] = useState(true);
-
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!sessionId) return;
-    setLoading(true);
-    apiFetch(`/api/demo/${sessionId}/brand`)
-      .then((res) => res.json())
-      .then((resData) => {
-        setData(resData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to load dashboard:", err);
-        setLoading(false);
-      });
-  }, [sessionId]);
+    let active = true;
+    setLoading(true); setError("");
+    apiFetch(`/api/demo/${sessionId}/brand?days=${period}`, retry ? { cache: "no-store" } : undefined)
+      .then(readApiResponse)
+      .then(result => { if (active) setData(result); })
+      .catch(cause => { if (active) setError(cause.message || "Could not load your dashboard."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [sessionId, period, retry]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: "40px 0", textAlign: "center", color: "#777" }}>
-        <div
-          style={{
-            width: "30px",
-            height: "30px",
-            border: "3px solid #e2e6de",
-            borderTopColor: "#4a5442",
-            borderRadius: "50%",
-            animation: "business-spin 0.8s linear infinite",
-            margin: "0 auto 12px",
-          }}
-        />
-        Loading workspace dashboard...
-      </div>
-    );
-  }
-
-  const brand = data?.brand || { name: "Your brand" };
-  const metrics = data?.metrics || {
-    totalRegistrations: 0,
-    openClaimsCount: 0,
-    needsReviewCount: 0,
-    productsCount: 0,
-  };
-  const chartData: { label: string; count: number }[] = data?.chartData || [];
-  const recentClaims: any[] = data?.recentClaims || [];
-
-
-
-  return (
-    <div>
-      <div className="business-page-header">
-        <div>
-          <div className="business-eyebrow">Workspace Overview</div>
-          <h1>{brand.name} Operations</h1>
-          <p>Real-time warranty registrations, claims review, and warranty aftercare health.</p>
-        </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">
-            Add product
-          </Link>
-          <Link to={`/demo/${sessionId}/customer`} className="business-button">
-            Customer portal <ArrowUpRight size={14} />
-          </Link>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "26px" }}>
-        <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
-            <span>REGISTERED UNITS</span>
-            <ShieldCheck size={16} color="#556b4f" />
-          </div>
-          <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: "#242a25", margin: "8px 0 2px" }}>
-            {metrics.totalRegistrations}
-          </div>
-          <div style={{ fontSize: "14px", color: "#596258" }}>Active warranty records</div>
-        </div>
-
-        <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
-            <span>OPEN CLAIMS</span>
-            <Inbox size={16} color="#8a7337" />
-          </div>
-          <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: "#242a25", margin: "8px 0 2px" }}>
-            {metrics.openClaimsCount}
-          </div>
-          <div style={{ fontSize: "14px", color: "#596258" }}>Under active processing</div>
-        </div>
-
-        <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
-            <span>NEEDS REVIEW</span>
-            <AlertCircle size={16} color="#a5655d" />
-          </div>
-          <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: metrics.needsReviewCount > 0 ? "#a5655d" : "#242a25", margin: "8px 0 2px" }}>
-            {metrics.needsReviewCount}
-          </div>
-          <div style={{ fontSize: "14px", color: "#596258" }}>Requires decision today</div>
-        </div>
-
-        <div className="business-panel" style={{ padding: "18px 20px", marginBottom: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#596258", fontSize: "14px", fontWeight: 600 }}>
-            <span>CATALOG MODELS</span>
-            <Package size={16} color="#4f6798" />
-          </div>
-          <div style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-1px", color: "#242a25", margin: "8px 0 2px" }}>
-            {metrics.productsCount}
-          </div>
-          <div style={{ fontSize: "14px", color: "#596258" }}>Products in warranty catalog</div>
-        </div>
-      </div>
-
-      {/* 30-Day Registration Trend Chart */}
-      <div className="business-panel">
-        <div className="business-panel-header">
-          <div>
-            <h2>30-Day Registrations Trend</h2>
-            <p>New unit warranty activations recorded over the last month.</p>
-          </div>
-          <Link to={`/demo/${sessionId}/brand/registrations`} className="business-text-link">
-            View all registrations →
-          </Link>
-        </div>
-        <div style={{ padding: "24px 22px 18px" }}>
-          <RegistrationChart data={chartData} />
-        </div>
-      </div>
-
-      {/* Recent Claims Inbox */}
-      <div className="business-panel">
-        <div className="business-panel-header">
-          <div>
-            <h2>Recent Claims Attention</h2>
-            <p>Customer submissions awaiting review or updates.</p>
-          </div>
-          <Link to={`/demo/${sessionId}/brand/claims`} className="business-button small">
-            Open Claims Inbox
-          </Link>
-        </div>
-
-        {recentClaims.length === 0 ? (
-          <div className="business-empty">
-            <CheckCircle2 size={32} color="#748c66" />
-            <h2>No claims pending review</h2>
-            <p>All customer warranty claims have been processed or none have been submitted yet.</p>
-          </div>
-        ) : (
-          <div className="business-table-wrap">
-            <table className="business-table">
-              <thead>
-                <tr>
-                  <th>CLAIM</th>
-                  <th>CUSTOMER</th>
-                  <th>PRODUCT</th>
-                  <th>STATUS</th>
-                  <th>SUBMITTED</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentClaims.map((claim) => (
-                  <tr key={claim.id}>
-                    <td>
-                      <Link to={`/demo/${sessionId}/brand/claims/${claim.id}`} className="business-row-link">
-                        {claim.reference}
-                      </Link>
-                      <small>{claim.issueTitle}</small>
-                    </td>
-                    <td>{claim.customerName}</td>
-                    <td>{claim.productName}</td>
-                    <td>
-                      <ClaimStatusBadge status={claim.status}/>
-                    </td>
-                    <td className="business-mono" style={{ fontSize: "14px" }}>
-                      {formatDate(claim.submittedAt)}
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <Link to={`/demo/${sessionId}/brand/claims/${claim.id}`} className="business-button small">
-                        Review
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+  if (!data) return <div className={styles.loading} role={error ? "alert" : "status"}>{error || "Loading your dashboard…"}{error && <button className="business-button" onClick={() => setRetry(value => value + 1)}>Try again</button>}</div>;
+  const base = `/demo/${sessionId}/brand`;
+  const { metrics } = data;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const cards = [
+    { label: "Registered units", value: metrics.totalRegistrations, note: "Total warranty registrations", icon: ShieldCheck, href: `${base}/registrations` },
+    { label: "Open claims", value: metrics.openClaimsCount, note: "Submitted or being processed", icon: Inbox, href: `${base}/claims?status=open` },
+    { label: "Expiring soon", value: metrics.expiringSoonCount, note: "Coverage ending within 30 days", icon: Clock3, href: `${base}/registrations?filter=expiring` },
+    { label: "Catalog models", value: metrics.productsCount, note: "Products in your catalog", icon: Package, href: `${base}/products` },
+  ];
+  const attention = [
+    { count: metrics.needsReviewCount, text: metrics.needsReviewCount === 1 ? "claim awaiting review" : "claims awaiting review", link: "View claims", href: `${base}/claims?status=needs_review`, icon: Inbox },
+    { count: metrics.expiringSoonCount, text: metrics.expiringSoonCount === 1 ? "warranty expiring in 30 days" : "warranties expiring in 30 days", link: "View warranties", href: `${base}/registrations?filter=expiring`, icon: Clock3 },
+    { count: metrics.missingDetailsCount, text: metrics.missingDetailsCount === 1 ? "registration missing details" : "registrations missing details", link: "View registrations", href: `${base}/registrations?filter=missing_details`, icon: ClipboardList },
+  ];
+  const needsAttention = attention.some(item => item.count > 0);
+  return <div className={styles.dashboard}>
+    <header className={styles.heading}>
+      <div><h1>{greeting}, {data.brand.name}</h1><p>Here's what needs your attention today.</p></div>
+      <span className={styles.date}><CalendarDays size={16}/><time dateTime={new Date().toLocaleDateString("en-CA")}>{new Date().toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })}</time></span>
+    </header>
+    {error && <div className="business-notice error" role="alert">{error} <button className="business-button small" onClick={() => setRetry(value => value + 1)}>Try again</button></div>}
+    <section className={styles.metrics} aria-label="Warranty summary">
+      {cards.map(({ label, value, note, icon: Icon, href }) => <Link key={label} to={href} className={styles.metric}>
+        <span className={styles.metricLabel}><span className={styles.icon}><Icon size={17}/></span>{label}</span>
+        <strong>{value.toLocaleString()}</strong><span className={styles.metricNote}>{note}</span>
+      </Link>)}
+    </section>
+    <div className={styles.overview}>
+      <section className={styles.panel} aria-labelledby="warranty-overview">
+        <div className={styles.panelHeading}><h2 id="warranty-overview">Warranty overview</h2><select aria-label="Warranty overview period" value={period} onChange={event => setPeriod(Number(event.target.value) as 30 | 90)}><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select></div>
+        <div className={styles.chart} aria-busy={loading}><p className={styles.chartCaption}>{loading ? "Updating activity…" : `${data.chartData.reduce((sum, day) => sum + day.count, 0).toLocaleString()} registrations in the last ${data.periodDays} days`}</p><RegistrationChart data={data.chartData} color="#729cf2" height={204} periodDays={data.periodDays} labelCount={5}/></div>
+      </section>
+      <section className={`${styles.panel} ${styles.attention} ${needsAttention ? styles.attentionNeeded : ""}`} aria-labelledby="attention-heading">
+        <div className={styles.panelHeading}><h2 id="attention-heading">Needs your attention</h2>{!needsAttention && <CheckCircle2 size={18} aria-label="All caught up"/>}</div>
+        <div className={styles.attentionList}>{attention.map(({ count, text, link, href, icon: Icon }) => <div key={link} className={styles.attentionRow}>
+          <span className={styles.icon}><Icon size={17}/></span><p><strong>{count}</strong> {text}</p><Link to={href}>{link}<ArrowRight size={14}/></Link>
+        </div>)}</div>
+        <p className={styles.attentionNote}>{needsAttention ? "Review these items to keep your aftercare moving." : "You're all caught up. New items will appear here."}</p>
+      </section>
     </div>
-  );
+    <section className={styles.panel} aria-labelledby="recent-registrations">
+      <div className={styles.panelHeading}><h2 id="recent-registrations">Recent registrations</h2><Link to={`${base}/registrations`} className={styles.viewAll}>View all<ArrowRight size={15}/></Link></div>
+      {data.recentRegistrations.length ? <div className={styles.tableWrap}><table className={styles.table}>
+        <thead><tr><th>Product</th><th>Customer</th><th>Date</th><th>Status</th></tr></thead>
+        <tbody>{data.recentRegistrations.map(registration => <tr key={registration.id}>
+          <td><Link className={styles.product} to={`${base}/products/${registration.unit.productModel.id}`}><span className={styles.photo}>{registration.unit.productModel.imageUrl ? <ProductPhoto src={registration.unit.productModel.imageUrl} alt={registration.unit.productModel.name}/> : <Package size={21}/>}</span><span><strong>{registration.unit.productModel.name}</strong><small>{registration.unit.serialNumber}</small></span></Link></td>
+          <td><strong>{registration.customer.name}</strong><small>{registration.customer.email}</small></td>
+          <td><time dateTime={registration.registeredAt}>{formatDate(registration.registeredAt)}</time></td>
+          <td><span className={styles.registered}>Registered</span></td>
+        </tr>)}</tbody>
+      </table></div> : <div className={styles.empty}><ShieldCheck size={26}/><h3>No registrations yet</h3><p>Customer warranty registrations will appear here as they come in.</p><Link to={`${base}/products`}>View your products<ArrowRight size={15}/></Link></div>}
+    </section>
+  </div>;
 }
 export default BrandDashboard;

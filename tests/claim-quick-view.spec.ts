@@ -1,0 +1,44 @@
+import { expect, test } from "@playwright/test";
+
+test("claim panel fits long references, moves, and opens the full claim", async ({ page }) => {
+  const sessionId = "11111111-1111-4111-8111-111111111111";
+  const reference = "VCH-AC01781F2BB041E99DB49A1066058E5A";
+  const model = { name: "AIR400", sku: "AIR400", imageUrl: "/images/jb-air-products.png#xywh=43,36,108,161" };
+  const customer = { name: "Customer", email: "customer@example.test" };
+  const claim = { id: "claim-1", reference, status: "UNDER_REVIEW", issueTitle: "Product stopped working", description: "The product no longer starts.", issueTags: ["Not working"], submittedAt: "2026-10-26T00:00:00Z", registration: { customer, coverageEndsOn: "2029-10-02T00:00:00Z", unit: { serialNumber: "S-1", productModel: model } }, events: [{ id: "event-1", note: "Claim submitted", createdAt: "2026-10-26T00:00:00Z" }], attachments: [] };
+  await page.route("**/api/**", async (route) => {
+    const url = new URL(route.request().url());
+    let data: unknown = {};
+    if (url.pathname === "/api/auth/me") data = { account: { id: "account", role: "BRAND", displayName: "Owner", demoSessionId: sessionId } };
+    else if (url.pathname.endsWith("/brand/settings")) data = { brand: { name: "Brand", logoUrl: null } };
+    else if (url.pathname.endsWith("/brand/claims/claim-1")) data = { claim };
+    else if (url.pathname.endsWith("/brand/claims")) data = { claims: [{ ...claim, customer, unit: { serialNumber: "S-1", productModel: model.name, sku: model.sku, imageUrl: model.imageUrl } }], products: [], counts: { all: 1, in_review: 1 } };
+    await route.fulfill({ json: data });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`http://127.0.0.1:4173/demo/${sessionId}/brand/claims`);
+  const table = page.getByRole("table");
+  await expect(table.getByText(reference)).toBeVisible();
+  expect(await table.locator("..").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBeTruthy();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  const panel = page.getByRole("complementary", { name: "Claim details" });
+  await expect(panel.getByText(reference)).toBeVisible();
+  await expect(panel.getByRole("img", { name: "AIR400" })).toBeVisible();
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBeTruthy();
+  const before = await panel.boundingBox();
+  const handle = panel.getByRole("button", { name: /Move claim panel/ });
+  const handleBounds = await handle.boundingBox();
+  if (!before || !handleBounds) throw new Error("Claim panel did not render.");
+  await page.mouse.move(handleBounds.x + handleBounds.width / 2, handleBounds.y + handleBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBounds.x - 90, handleBounds.y + 35, { steps: 5 });
+  await page.mouse.up();
+  const after = await panel.boundingBox();
+  expect(after!.x).toBeLessThan(before.x - 50);
+  await panel.getByRole("button", { name: "Customer" }).click();
+  await expect(panel.getByText(customer.email)).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Open full claim", exact: true }).last()).toHaveAttribute("href", `/demo/${sessionId}/brand/claims/claim-1`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(panel).toBeVisible();
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBeTruthy();
+});

@@ -1,9 +1,25 @@
 import { ClaimStatusBadge } from "@/components/claim-status-badge";
 import { apiFetch } from "@/lib/api-fetch";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Search, Filter, Inbox, CheckCircle2, ChevronRight, AlertCircle } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Inbox, RotateCcw, Search, X } from "lucide-react";
 import { formatDate } from "@/lib/dates";
+import styles from "@/components/brand-claims.module.css";
+import { ClaimQuickView } from "@/components/claim-quick-view";
+import { ProductPhoto } from "@/components/product-photo";
+import { createPortal } from "react-dom";
+import { AnimatePresence } from "framer-motion";
+
+type ProductOption = { id: string; name: string; issueTags: string[] };
+
+function shuffledSample(values: string[], count: number) {
+  const copy = [...values];
+  for (let index = copy.length - 1; index > 0; index--) {
+    const target = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[target]] = [copy[target], copy[index]];
+  }
+  return copy.slice(0, count);
+}
 
 const claimStatusLabel: Record<string, string> = {
   SUBMITTED: "New / Needs Review",
@@ -29,12 +45,18 @@ export function BrandClaims() {
   const currentStatus = searchParams.get("status") || "all";
   const currentProduct = searchParams.get("product") || "";
   const currentSearch = searchParams.get("search") || "";
+  const selectedTags = searchParams.getAll("tag");
 
   const [claims, setClaims] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(currentSearch);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setSearchTerm(currentSearch); }, [currentSearch]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -44,6 +66,7 @@ export function BrandClaims() {
     if (currentStatus !== "all") query.set("status", currentStatus);
     if (currentProduct) query.set("product", currentProduct);
     if (currentSearch) query.set("search", currentSearch);
+    selectedTags.forEach((tag) => query.append("tag", tag));
 
     apiFetch(`/api/demo/${sessionId}/brand/claims?${query.toString()}`)
       .then((res) => res.json())
@@ -57,7 +80,24 @@ export function BrandClaims() {
         console.error("Failed to load claims:", err);
         setLoading(false);
       });
-  }, [sessionId, currentStatus, currentProduct, currentSearch]);
+  }, [sessionId, currentStatus, currentProduct, currentSearch, selectedTags.join("\u001f")]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [moreOpen]);
+
+  const activeProduct = products.find((product) => product.id === currentProduct);
+  const allTags = useMemo(() => Array.from(new Set(products.flatMap((product) => product.issueTags || []))), [products]);
+  const tagSetKey = activeProduct ? `${activeProduct.id}:${activeProduct.issueTags.join("|")}` : `all:${allTags.join("|")}`;
+  const quickTags = useMemo(() => activeProduct ? activeProduct.issueTags : shuffledSample(allTags, 6), [tagSetKey]);
+  const moreTags = activeProduct ? [] : allTags.filter((tag) => !quickTags.includes(tag));
+  const hiddenSelectedCount = selectedTags.filter((tag) => moreTags.includes(tag)).length;
+  const filtersActive = currentStatus !== "all" || Boolean(currentProduct || currentSearch || selectedTags.length);
 
   const handleTabChange = (statusKey: string) => {
     const next = new URLSearchParams(searchParams);
@@ -70,12 +110,22 @@ export function BrandClaims() {
   };
 
   const handleProductChange = (prodId: string) => {
+    setMoreOpen(false);
     const next = new URLSearchParams(searchParams);
     if (!prodId) {
       next.delete("product");
     } else {
       next.set("product", prodId);
     }
+    next.delete("tag");
+    setSearchParams(next);
+  };
+
+  const handleTagToggle = (tag: string) => {
+    const next = new URLSearchParams(searchParams);
+    const tags = next.getAll("tag");
+    next.delete("tag");
+    (tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag]).forEach((item) => next.append("tag", item));
     setSearchParams(next);
   };
 
@@ -90,6 +140,19 @@ export function BrandClaims() {
     setSearchParams(next);
   };
 
+  const clearSearch = () => {
+    setSearchTerm("");
+    const next = new URLSearchParams(searchParams);
+    next.delete("search");
+    setSearchParams(next);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setMoreOpen(false);
+    setSearchParams(new URLSearchParams());
+  };
+
   const tabs = [
     { key: "all", label: "All Claims", count: counts.all ?? 0 },
     { key: "needs_review", label: "Needs Review", count: counts.needs_review ?? 0 },
@@ -100,79 +163,49 @@ export function BrandClaims() {
   ];
 
   return (
-    <div>
+    <div className={styles.claimsLayout}>
+      <div className={styles.claimsMain}>
       <div className="business-page-header">
         <div>
-          <div className="business-eyebrow">Claims Inbox</div>
-          <h1>Warranty Claims</h1>
+          <h1>Claims</h1>
           <p>Review customer evidence, request details, approve resolutions or record decisions.</p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #e8e9e6", marginBottom: "20px", overflowX: "auto" }}>
+      <div className={styles.claimTabs}>
         {tabs.map((tab) => {
           const active = currentStatus === tab.key;
           return (
             <button
               key={tab.key}
+              type="button"
               onClick={() => handleTabChange(tab.key)}
-              style={{
-                border: 0,
-                background: "transparent",
-                padding: "10px 14px",
-                fontSize: "14px",
-                fontWeight: active ? 700 : 500,
-                color: active ? "#242a25" : "#727a72",
-                borderBottom: active ? "2px solid #363e31" : "2px solid transparent",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "7px",
-                whiteSpace: "nowrap",
-              }}
+              className={active ? styles.claimTabActive : styles.claimTab}
             >
               {tab.label}
-              <span
-                style={{
-                  fontSize: "14px",
-                  background: active ? "#e8ebe5" : "#f2f4ef",
-                  padding: "2px 7px",
-                  borderRadius: "10px",
-                  color: active ? "#242a25" : "#80887d",
-                }}
-              >
-                {tab.count}
-              </span>
+              <span>{tab.count}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Search and Filters */}
-      <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", marginBottom: "22px" }}>
-        <form onSubmit={handleSearchSubmit} className="business-search" style={{ margin: 0, flex: "1 1 280px" }}>
-          <Search size={15} />
+      <section className={styles.filterPanel} aria-label="Claim filters">
+        <div className={styles.filterTopRow}>
+        <form onSubmit={handleSearchSubmit} className="business-search">
+          <Search size={16} />
           <input
-            type="text"
-            placeholder="Search by claim reference, customer, or serial..."
+            type="search"
+            aria-label="Search claims"
+            placeholder="Search reference, customer, issue, or serial"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && <button type="button" className={styles.clearSearch} aria-label="Clear search" onClick={clearSearch}><X size={15}/></button>}
         </form>
 
-        <select
+        <label className={styles.productFilter}><span>Product</span><select
           value={currentProduct}
           onChange={(e) => handleProductChange(e.target.value)}
-          style={{
-            padding: "8px 12px",
-            fontSize: "14px",
-            border: "1px solid #dde3d6",
-            borderRadius: "6px",
-            background: "#fff",
-            color: "#384034",
-            outline: 0,
-          }}
         >
           <option value="">All products</option>
           {products.map((p) => (
@@ -180,8 +213,20 @@ export function BrandClaims() {
               {p.name}
             </option>
           ))}
-        </select>
-      </div>
+        </select></label>
+        {filtersActive && <button type="button" className={styles.resetFilters} onClick={resetFilters}><RotateCcw size={15}/> Reset filters</button>}
+        </div>
+
+        <div className={styles.tagFilterBlock}>
+          {quickTags.length > 0 ? <div className={styles.tagFilterList}>
+            {quickTags.map((tag) => <button type="button" key={tag} className={selectedTags.includes(tag) ? styles.tagFilterActive : styles.tagFilter} aria-pressed={selectedTags.includes(tag)} onClick={() => handleTagToggle(tag)}>{selectedTags.includes(tag) && <Check size={14}/>} {tag}</button>)}
+            {moreTags.length > 0 && <div className={styles.moreFilter} ref={moreRef}>
+              <button type="button" className={styles.moreButton} aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>More{hiddenSelectedCount > 0 && <span>{hiddenSelectedCount}</span>}<ChevronDown size={15}/></button>
+              {moreOpen && <div className={styles.moreMenu} role="group" aria-label="More issue tags">{moreTags.map((tag) => <label key={tag}><input type="checkbox" checked={selectedTags.includes(tag)} onChange={() => handleTagToggle(tag)}/><span>{tag}</span></label>)}</div>}
+            </div>}
+          </div> : <p className={styles.noTags}>{activeProduct ? "This product has no issue tags configured yet." : "Add issue tags to products to filter claims here."}</p>}
+        </div>
+      </section>
 
       {/* Table */}
       <div className="business-panel">
@@ -204,11 +249,12 @@ export function BrandClaims() {
           <div className="business-empty">
             <Inbox size={32} />
             <h2>No claims found</h2>
-            <p>No warranty claims match your current filter criteria or search query.</p>
+            <p>No warranty claims match the selected status, product, tags, or search.</p>
+            {filtersActive && <button type="button" className="business-button" onClick={resetFilters}>Reset filters</button>}
           </div>
         ) : (
           <div className="business-table-wrap">
-            <table className="business-table">
+            <table className={`business-table ${styles.claimsTable}`}>
               <thead>
                 <tr>
                   <th>CLAIM REFERENCE</th>
@@ -221,11 +267,11 @@ export function BrandClaims() {
               </thead>
               <tbody>
                 {claims.map((claim) => (
-                  <tr key={claim.id}>
+                  <tr key={claim.id} onClick={() => setSelectedClaimId(claim.id)}>
                     <td>
-                      <Link to={`/demo/${sessionId}/brand/claims/${claim.id}`} className="business-row-link">
+                      <button type="button" onClick={() => setSelectedClaimId(claim.id)} className={styles.claimOpen}>
                         {claim.reference}
-                      </Link>
+                      </button>
                       <small>{claim.issueTitle}</small>
                     </td>
                     <td>
@@ -233,8 +279,7 @@ export function BrandClaims() {
                       <small>{claim.customer.email}</small>
                     </td>
                     <td>
-                      <strong>{claim.unit.productModel}</strong>
-                      <small className="business-mono">SN: {claim.unit.serialNumber}</small>
+                      <span className={styles.productCell}>{claim.unit.imageUrl ? <ProductPhoto src={claim.unit.imageUrl} alt={claim.unit.productModel}/> : <span className={styles.productPlaceholder}/>}<span><strong>{claim.unit.productModel}</strong><small>{claim.unit.sku ? `SKU: ${claim.unit.sku}` : `SN: ${claim.unit.serialNumber}`}</small></span></span>
                     </td>
                     <td>
                       <ClaimStatusBadge status={claim.status}/>
@@ -243,9 +288,7 @@ export function BrandClaims() {
                       {formatDate(claim.submittedAt)}
                     </td>
                     <td>
-                      <Link to={`/demo/${sessionId}/brand/claims/${claim.id}`} className="business-button small">
-                        View <ChevronRight size={13} />
-                      </Link>
+                      <button type="button" onClick={() => setSelectedClaimId(claim.id)} className={styles.viewButton}>View</button>
                     </td>
                   </tr>
                 ))}
@@ -254,6 +297,8 @@ export function BrandClaims() {
           </div>
         )}
       </div>
+      </div>
+      {createPortal(<AnimatePresence>{selectedClaimId && sessionId && <ClaimQuickView key={selectedClaimId} sessionId={sessionId} claimId={selectedClaimId} onClose={() => setSelectedClaimId(null)}/>}</AnimatePresence>, document.body)}
     </div>
   );
 }

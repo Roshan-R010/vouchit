@@ -2,9 +2,10 @@ import { AddProductUnit } from "@/components/add-product-unit";
 import { ProductIssueTags } from "@/components/product-issue-tags";
 import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
+import { ProductImageEditor } from "@/components/product-image-editor";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Package, ExternalLink } from "lucide-react";
+import { ArrowLeft, Package, ExternalLink, ImagePlus } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 
 export function BrandProductDetail() {
@@ -13,6 +14,7 @@ export function BrandProductDetail() {
   const [product, setProduct] = useState<any>(null);
   const [brand, setBrand] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [editingImage, setEditingImage] = useState(false);
 
   useEffect(() => {
     if (!sessionId || !productId) return;
@@ -89,8 +91,11 @@ export function BrandProductDetail() {
               Open registration page <ExternalLink size={12} />
             </a>
           </div>
+          <button type="button" className="business-button small" style={{ marginTop: 14 }} onClick={() => setEditingImage(true)}><ImagePlus size={16}/> Change image</button>
         </div>
       </div>
+
+      {editingImage && sessionId && productId && <ProductImageEditor sessionId={sessionId} productId={productId} productName={product.name} imageUrl={product.imageUrl} onClose={() => setEditingImage(false)} onSaved={(url) => { setProduct((current: any) => ({ ...current, imageUrl: url })); setEditingImage(false); }}/ >}
 
       {sessionId && productId && <ProductIssueTags key={productId} sessionId={sessionId} productId={productId} initialTags={product.issueTags || []}/>}
       {sessionId && productId && <AddProductUnit sessionId={sessionId} productId={productId} onSaved={() => setVersion(value => value + 1)}/>}

@@ -1,28 +1,35 @@
 import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
 import { formatDate, isCoverageActive, daysRemaining } from "@/lib/dates";
 
 export function BrandRegistrations() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter = searchParams.get("filter") || "";
+  const filterLabel = filter === "expiring" ? "Expiring within 30 days" : filter === "missing_details" ? "Missing registration details" : "";
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!sessionId) return;
     setLoading(true);
-    apiFetch(`/api/demo/${sessionId}/brand/registrations`)
+    let active = true;
+    apiFetch(`/api/demo/${sessionId}/brand/registrations${filterLabel ? `?filter=${filter}` : ""}`)
       .then((res) => res.json())
       .then((data) => {
+        if (!active) return;
         setRegistrations(data.registrations || []);
         setLoading(false);
       })
       .catch((err) => {
+        if (!active) return;
         console.error("Failed to load registrations:", err);
         setLoading(false);
       });
-  }, [sessionId]);
+    return () => { active = false; };
+  }, [sessionId, filter]);
 
   if (loading) {
     return (
@@ -53,12 +60,13 @@ export function BrandRegistrations() {
         </div>
       </div>
 
+      {filterLabel && <div className="business-start-strip"><span>{filterLabel} · {registrations.length} {registrations.length === 1 ? "record" : "records"}</span><button className="business-button small" onClick={() => setSearchParams({})}>Show all registrations</button></div>}
       <div className="business-panel">
         {registrations.length === 0 ? (
           <div className="business-empty">
             <ShieldCheck size={32} />
-            <h2>No active registrations yet</h2>
-            <p>Customers will appear here when they register their stamped unit IDs.</p>
+            <h2>{filterLabel ? "No registrations match this filter" : "No registrations yet"}</h2>
+            <p>{filterLabel ? "You can return to all registrations using the button above." : "Customers will appear here when they register their stamped unit IDs."}</p>
           </div>
         ) : (
           <div className="business-table-wrap">

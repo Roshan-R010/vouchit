@@ -1,7 +1,8 @@
 import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { ProductPhoto } from "@/components/product-photo";
 import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 
@@ -24,6 +25,7 @@ function claimBadgeStyle(status: string): React.CSSProperties {
 
 export function BrandClaimDetail() {
   const { sessionId, claimId } = useParams<{ sessionId: string; claimId: string }>();
+  const [searchParams] = useSearchParams();
   const [claim, setClaim] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -45,7 +47,7 @@ export function BrandClaimDetail() {
           setClaim(data.claim);
           // Set default decision based on status
           if (data.claim.status === "SUBMITTED") setDecision("review");
-          else if (data.claim.status === "UNDER_REVIEW") setDecision("approve");
+          else if (data.claim.status === "UNDER_REVIEW") setDecision(["approve", "request_info", "reject"].includes(searchParams.get("decision") || "") ? searchParams.get("decision")! : "approve");
           else if (data.claim.status === "APPROVED") setDecision("resolve");
         }
         setLoading(false);
@@ -170,6 +172,7 @@ export function BrandClaimDetail() {
               <h2>Product & Delivery Record</h2>
             </div>
             <div style={{ padding: "18px 22px" }}>
+              {unit.productModel.imageUrl && <div style={{ width: 140, height: 140, marginBottom: 20, background: "#eef3f7", borderRadius: 8, overflow: "hidden" }}><ProductPhoto src={unit.productModel.imageUrl} alt={unit.productModel.name}/></div>}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "14px" }}>
                 <div>
                   <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Model</div>

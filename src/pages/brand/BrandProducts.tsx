@@ -1,15 +1,22 @@
 import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Plus, Package, Copy, Check, ExternalLink } from "lucide-react";
-import { BrandCopyLink } from "@/components/brand-copy-link";
+import { ChevronDown, ChevronRight, Grid2X2, ImagePlus, List, Package, Search } from "lucide-react";
+import { ProductImageEditor } from "@/components/product-image-editor";
+import styles from "./brand-products.module.css";
 
 export function BrandProducts() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [products, setProducts] = useState<any[]>([]);
   const [brand, setBrand] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [editing, setEditing] = useState<any>(null);
+
+  const visible = useMemo(() => products.filter((product) => `${product.name} ${product.sku || ""}`.toLowerCase().includes(search.trim().toLowerCase()) && (filter === "all" || (filter === "registered" ? product.units?.some((unit: any) => unit.registration) : !product.units?.length))), [products, search, filter]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -27,89 +34,21 @@ export function BrandProducts() {
       });
   }, [sessionId]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", color: "#777" }}>
-        <div
-          style={{
-            width: "30px",
-            height: "30px",
-            border: "3px solid #e2e6de",
-            borderTopColor: "#4a5442",
-            borderRadius: "50%",
-            animation: "business-spin 0.8s linear infinite",
-            margin: "0 auto 12px",
-          }}
-        />
-        Loading products catalog...
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="business-page-header">
-        <div>
-          <div className="business-eyebrow">Product Catalog</div>
-          <h1>Warrantied Models</h1>
-          <p>Manage product models, standard warranty periods, and stamped unit registration links.</p>
-        </div>
-        <Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">
-          Add product
-        </Link>
-      </div>
-
-      <div className="business-catalog">
-        {products.map((p) => {
-          const registeredCount = p.units?.filter((u: any) => u.registration).length || 0;
-          const totalUnits = p.units?.length || 0;
-          const regLink = `/demo/${sessionId}/register/${brand?.slug || ""}/${p.slug}`;
-
-          return (
-            <div key={p.id} className="business-product-card">
-              <div className="business-product-image">
-                {p.imageUrl ? (
-                  <ProductPhoto src={p.imageUrl} alt={p.name} />
-                ) : (
-                  <Package size={44} strokeWidth={1.5} />
-                )}
-              </div>
-              <div className="business-product-card-body">
-                <div className="business-product-title">
-                  <span>{p.name}</span>
-                  <span className="business-badge">{p.warrantyMonths}m Warranty</span>
-                </div>
-                <div className="business-muted">SKU: {p.sku || "N/A"}</div>
-
-                <div className="business-product-facts">
-                  <div>
-                    <span>Total Units:</span> <strong>{totalUnits}</strong>
-                  </div>
-                  <div>
-                    <span>Registered:</span> <strong>{registeredCount}</strong>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: "14px", display: "flex", gap: "8px" }}>
-                  <Link to={`/demo/${sessionId}/brand/products/${p.id}`} className="business-button small" style={{ flex: 1 }}>
-                    Manage product
-                  </Link>
-                  <Link
-                    to={regLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="business-button small"
-                    title="Open customer registration link"
-                  >
-                    <ExternalLink size={13} />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+  return <div className={styles.page}>
+    <div className="business-page-header"><div><h1>Products</h1><p>Manage product models, warranty periods, and registration links.</p></div><Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">Add product</Link></div>
+    <div className={styles.toolbar}>
+      <label className={styles.search}><Search size={17}/><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" aria-label="Search products"/></label>
+      <label className={styles.filter}><span className="sr-only">Filter products</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All products</option><option value="registered">Registered units</option><option value="empty">No units yet</option></select><ChevronDown size={15}/></label>
+      <div className={styles.viewSwitch} role="group" aria-label="Catalog view"><button type="button" aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={17}/></button><button type="button" aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")}><List size={18}/></button></div>
     </div>
-  );
+    {loading ? <div className={styles.empty}>Loading products…</div> : visible.length === 0 ? <div className={styles.empty}>{products.length ? "No products match this search or filter." : "No products yet. Add your first product to get started."}</div> :
+      <div className={view === "grid" ? styles.grid : styles.list}>
+        {visible.map((product) => <article className={styles.card} key={product.id}>
+          <div className={styles.photo}>{product.imageUrl ? <ProductPhoto src={product.imageUrl} alt={product.name}/> : <Package size={44} strokeWidth={1.4}/>}<button type="button" className={styles.editPhoto} onClick={() => setEditing(product)} aria-label={`Change image for ${product.name}`} title="Change image"><ImagePlus size={17}/></button></div>
+          <div className={styles.details}><Link className={styles.name} to={`/demo/${sessionId}/brand/products/${product.id}`}>{product.name}</Link><span className={styles.sku}>SKU: {product.sku || "Not set"}</span><span className={styles.warranty}>{product.warrantyMonths}m warranty</span><div className={styles.footer}><span>{(product.units?.length || 0).toLocaleString()} {product.units?.length === 1 ? "unit" : "units"}</span><Link to={`/demo/${sessionId}/brand/products/${product.id}`} aria-label={`Manage ${product.name}`}><ChevronRight size={21}/></Link></div></div>
+        </article>)}
+      </div>}
+    {editing && sessionId && <ProductImageEditor sessionId={sessionId} productId={editing.id} productName={editing.name} imageUrl={editing.imageUrl} onClose={() => setEditing(null)} onSaved={(url) => { setProducts((current) => current.map((product) => product.id === editing.id ? { ...product, imageUrl: url } : product)); setEditing(null); }}/ >}
+  </div>;
 }
 export default BrandProducts;

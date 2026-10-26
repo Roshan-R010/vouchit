@@ -1,4 +1,5 @@
 import { loadAnalytics } from "./analytics";
+import { loadBrandDashboard, registrationAttentionWhere } from "./dashboard";
 import { IssueTagValidationError, normalizeIssueTags, selectProductIssueTags } from "../src/lib/issue-tags";
 import express from "express";
 import cors from "cors";
@@ -224,68 +225,11 @@ app.get("/api/demo/:sessionId/brand", async (req, res) => {
   if (!sessionId) return;
   try {
     const brand = await requireBrand(sessionId);
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const [allRegistrations, allClaims, products, recentClaims, recentRegistrations] = await Promise.all([
-      db.warrantyRegistration.findMany({
-        where: { unit: { brandId: brand.id }, customer: { demoSessionId: sessionId } },
-        select: { registeredAt: true },
-      }),
-      db.warrantyClaim.findMany({
-        where: { registration: { unit: { brandId: brand.id }, customer: { demoSessionId: sessionId } } },
-        select: { status: true, issueTitle: true, reference: true, id: true, submittedAt: true },
-      }),
-      db.productModel.findMany({ where: { brandId: brand.id }, select: { id: true, name: true } }),
-      db.warrantyClaim.findMany({
-        where: { registration: { unit: { brandId: brand.id }, customer: { demoSessionId: sessionId } } },
-        include: { registration: { include: { customer: true, unit: { include: { productModel: true } } } } },
-        orderBy: { submittedAt: "desc" },
-        take: 5,
-      }),
-      db.warrantyRegistration.findMany({
-        where: { unit: { brandId: brand.id }, customer: { demoSessionId: sessionId }, registeredAt: { gte: thirtyDaysAgo } },
-        select: { registeredAt: true },
-        orderBy: { registeredAt: "asc" },
-      }),
-    ]);
-
-    const openStatuses = ["SUBMITTED", "UNDER_REVIEW", "INFO_REQUESTED"];
-    const openClaims = allClaims.filter((c) => openStatuses.includes(c.status));
-    const needsReview = allClaims.filter((c) => c.status === "SUBMITTED").length;
-
-    // Build chart data for last 30 days
-    const days: { label: string; count: number }[] = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const ds = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const count = recentRegistrations.filter((r) => r.registeredAt.toISOString().slice(0, 10) === ds).length;
-      days.push({ label, count });
-    }
-
-    res.json({
-      brand,
-      metrics: {
-        totalRegistrations: allRegistrations.length,
-        openClaimsCount: openClaims.length,
-        needsReviewCount: needsReview,
-        productsCount: products.length,
-      },
-      chartData: days,
-      recentClaims: recentClaims.map((claim) => ({
-        id: claim.id,
-        reference: claim.reference,
-        issueTitle: claim.issueTitle,
-        status: claim.status,
-        submittedAt: claim.submittedAt,
-        customerName: claim.registration.customer.name,
-        productName: claim.registration.unit.productModel.name,
-      })),
-    });
-  } catch (error: any) {
+    const periodDays = req.query.days === "90" ? 90 : 30;
+    res.json({ brand, ...await loadBrandDashboard(brand.id, sessionId, periodDays) });
+  } catch (error) {
     console.error("Brand dashboard error:", error);
-    res.status(500).json({ error: error.message || "Failed to load brand dashboard" });
+    res.status(500).json({ error: "Could not load your dashboard. Please try again." });
   }
 });
 
@@ -295,7 +239,12 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
   if (!sessionId) return;
   try {
     const brand = await requireBrand(sessionId);
-    const { status, product, search } = req.query;
+    const { status, product, search, tag } = req.query;
+    const selectedTags = (Array.isArray(tag) ? tag : tag ? [tag] : [])
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter((value, index, values) => value && values.indexOf(value) === index)
+      .slice(0, 30);
 
     const where: Prisma.WarrantyClaimWhereInput = {
       registration: {
@@ -307,6 +256,8 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
         customer: { demoSessionId: sessionId },
       },
     };
+
+    if (selectedTags.length) where.issueTags = { hasSome: selectedTags };
 
     if (status && typeof status === "string") {
       if (status === "open") {
@@ -349,7 +300,7 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
       }),
       db.productModel.findMany({
         where: { brandId: brand.id },
-        select: { id: true, name: true },
+        select: { id: true, name: true, issueTags: true },
         orderBy: { name: "asc" },
       }),
       db.warrantyClaim.findMany({
@@ -379,6 +330,7 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
         status: c.status,
         issueTitle: c.issueTitle,
         description: c.description,
+        issueTags: c.issueTags,
         submittedAt: c.submittedAt,
         resolutionMethod: c.resolutionMethod,
         customer: {
@@ -388,6 +340,8 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
         unit: {
           serialNumber: c.registration.unit.serialNumber,
           productModel: c.registration.unit.productModel.name,
+          imageUrl: c.registration.unit.productModel.imageUrl,
+          sku: c.registration.unit.productModel.sku,
           orderNumber: c.registration.unit.purchaseOrder.orderNumber,
           deliveredOn: c.registration.unit.purchaseOrder.deliveredOn,
         },
@@ -426,6 +380,7 @@ app.get("/api/demo/:sessionId/brand/claims/:claimId", async (req, res) => {
         },
         events: { orderBy: { createdAt: "asc" } },
         messages: { orderBy: { createdAt: "asc" } },
+        attachments: { select: { id: true } },
       },
     });
 
@@ -600,6 +555,27 @@ app.get("/api/demo/:sessionId/brand/products/:productId", async (req, res) => {
   }
 });
 
+app.patch("/api/demo/:sessionId/brand/products/:productId/image", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  if (!isUuid(req.params.productId)) return res.status(400).json({ error: "Invalid product ID." });
+  let uploadedImage: string | null = null;
+  try {
+    const brand = await requireBrand(sessionId);
+    const product = await db.productModel.findFirst({ where: { id: req.params.productId, brandId: brand.id } });
+    if (!product) return res.status(404).json({ error: "Product not found in this workspace." });
+    const image = imageFromDataUrl(req.body?.imageDataUrl, "product image");
+    if (!image) return res.status(400).json({ error: "Choose a product image." });
+    uploadedImage = await saveProductImage(sessionId, product.id, image);
+    const updated = await db.productModel.update({ where: { id: product.id }, data: { imageUrl: uploadedImage } });
+    if (product.imageUrl) await removeNewProductImage(product.imageUrl);
+    res.json({ imageUrl: updated.imageUrl });
+  } catch (error) {
+    if (uploadedImage) await removeNewProductImage(uploadedImage);
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not change the product image." });
+  }
+});
+
 app.post("/api/demo/:sessionId/brand/products/:productId/units", async (req, res) => {
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
@@ -769,6 +745,7 @@ app.get("/api/demo/:sessionId/brand/registrations", async (req, res) => {
       where: {
         unit: { brandId: brand.id, brand: { demoSessionId: sessionId } },
         customer: { demoSessionId: sessionId },
+        ...registrationAttentionWhere(req.query.filter),
       },
       include: {
         customer: true,

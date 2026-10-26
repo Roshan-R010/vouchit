@@ -97,7 +97,7 @@ export function CustomerDashboard() {
           {filteredWarranties.map((w) => (
             <article key={w.unitId} className="product-card">
               <div className="product-art">
-                {w.imageUrl ? <ProductPhoto src={w.imageUrl} alt={w.productName} /> : <Box size={54} color="#353b34" />}
+                {w.imageUrl ? <ProductPhoto src={w.imageUrl} alt={w.productName} fit="cover" /> : <Box size={54} color="#353b34" />}
               </div>
 
               <div className="product-copy">
