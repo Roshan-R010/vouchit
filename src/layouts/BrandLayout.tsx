@@ -11,6 +11,7 @@ export function BrandLayout() {
   const { sessionId } = useParams();
   const { pathname } = useLocation();
   const section = pathname.split("/brand")[1]?.split("/")[1];
+  const isClaimDetail = /\/brand\/claims\/[^/]+\/?$/.test(pathname);
   const sectionLabel = ({ claims: "Claims", products: "Products", customers: "Customers", registrations: "Registrations", analytics: "Analytics", settings: "Settings" } as Record<string, string>)[section || ""] || "Dashboard";
   const [brand, setBrand] = useState<{ name: string; logoUrl: string | null } | null>(null);
   const [navExpanded, setNavExpanded] = useState(() => {
@@ -29,7 +30,7 @@ export function BrandLayout() {
     return () => { active = false; window.removeEventListener("vouch:data-changed", update); };
   }, [sessionId]);
   if (!sessionId) return <p>Workspace not found.</p>;
-  return <div className="business-shell brand-shell" data-nav-expanded={navExpanded}>
+  return <div className="business-shell brand-shell" data-nav-expanded={navExpanded} data-claim-detail={isClaimDetail}>
     <BrandNav sessionId={sessionId} brandName={brand?.name || "Your brand"} logoUrl={brand?.logoUrl} expanded={navExpanded} onToggle={toggleNav}/>
     {navExpanded && <button type="button" className="brand-nav-scrim" aria-label="Close navigation" onClick={toggleNav}/>}
     <div className="business-main"><header className="business-topbar"><span><strong>{brand?.name || "Your brand"}</strong><span className="business-muted"> / {sectionLabel}</span></span></header><main className="business-content"><RouteTransition><Outlet/></RouteTransition></main></div>

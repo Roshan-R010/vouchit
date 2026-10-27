@@ -200,6 +200,7 @@ export async function updateUnitDeliveryAction(sessionId: string, productId: str
     await db.$transaction(async (tx) => {
       const unit = await tx.productUnit.findFirst({ where: { id: unitId, brandId: brand.id, productModelId: productId, purchaseOrder: { brandId: brand.id } }, include: { purchaseOrder: { include: { units: { select: { registration: { select: { id: true } } } } } } } });
       if (!unit) throw new FormError("Unit not found.");
+      if (!unit.purchaseOrder || !unit.purchaseOrderId) throw new FormError("This unit has no order.");
       if (unit.purchaseOrder.deliveredOn || unit.purchaseOrder.units.some((item) => item.registration)) throw new FormError("This order already has recorded warranty dates and cannot be changed here.");
       const changed = await tx.purchaseOrder.updateMany({ where: { id: unit.purchaseOrderId, brandId: brand.id, deliveredOn: null }, data: { deliveredOn } });
       if (changed.count !== 1) throw new FormError("This order was already updated. Refresh to see its delivery date.");

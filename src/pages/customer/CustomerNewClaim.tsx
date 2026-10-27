@@ -2,7 +2,9 @@ import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useRef, useState } from "react";
 import { readApiResponse } from "@/lib/api-response";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle } from "lucide-react";
+import { ArrowLeft, ImagePlus, X } from "lucide-react";
+import { prepareClaimPhoto, type PreparedClaimPhoto } from "@/lib/claim-photo";
+import styles from "./claim-photo-picker.module.css";
 
 export function CustomerNewClaim() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -21,21 +23,48 @@ export function CustomerNewClaim() {
   const [canSubmit, setCanSubmit] = useState(false);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [issueTags, setIssueTags] = useState<string[]>([]);
+  const [photoLimit, setPhotoLimit] = useState(0);
+  const [photos, setPhotos] = useState<PreparedClaimPhoto[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoBusyRef = useRef(false);
   useEffect(() => {
     let active = true;
-    setChecking(true); setCanSubmit(false); setAvailableTags([]); setIssueTags([]);
+    setChecking(true); setCanSubmit(false); setAvailableTags([]); setIssueTags([]); setPhotoLimit(0); setPhotos([]);
     if (!unitId) { setError("Choose a registered product from your dashboard to start a claim."); setChecking(false); return; }
     apiFetch(`/api/demo/${sessionId}/customer/products/${unitId}`).then(readApiResponse).then(data => {
       if (!active) return;
       if (data.registration.claim) navigate(`/demo/${sessionId}/customer/claims/${data.registration.claim.id}`, { replace: true });
-      else { setAvailableTags(data.registration.unit.productModel.issueTags || []); setCanSubmit(true); setChecking(false); }
+      else { setAvailableTags(data.registration.unit.productModel.issueTags || []); setPhotoLimit(data.registration.unit.productModel.claimPhotoLimit ?? 3); setCanSubmit(true); setChecking(false); }
     }).catch(cause => { if (active) { setError(cause.message); setChecking(false); } });
     return () => { active = false; };
   }, [sessionId, unitId, navigate]);
 
+  const handlePhotos = async (files: FileList | null) => {
+    if (!files?.length || photoBusyRef.current) return;
+    const incoming = Array.from(files);
+    if (photos.length + incoming.length > photoLimit) {
+      setPhotoError(`You can attach up to ${photoLimit} ${photoLimit === 1 ? "photo" : "photos"} for this product.`);
+      return;
+    }
+    photoBusyRef.current = true;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      const prepared: PreparedClaimPhoto[] = [];
+      for (const file of incoming) prepared.push(await prepareClaimPhoto(file));
+      setPhotos(current => [...current, ...prepared].slice(0, photoLimit));
+    } catch (cause) {
+      setPhotoError(cause instanceof Error ? cause.message : "Could not prepare the photos.");
+    } finally {
+      photoBusyRef.current = false;
+      setPhotoBusy(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sessionId || !unitId || submittingRef.current || checking || !canSubmit) return;
+    if (!sessionId || !unitId || submittingRef.current || checking || !canSubmit || photoBusyRef.current) return;
     submittingRef.current = true;
     setError(null);
     setSubmitting(true);
@@ -44,7 +73,7 @@ export function CustomerNewClaim() {
       const response = await apiFetch(`/api/demo/${sessionId}/customer/claims`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unitId, issueTitle, description, submissionId, issueTags }),
+        body: JSON.stringify({ unitId, issueTitle, description, submissionId, issueTags, photoDataUrls: photos.map(photo => photo.dataUrl) }),
       });
 
       const data = await readApiResponse(response);
@@ -108,7 +137,19 @@ export function CustomerNewClaim() {
             />
           </div>
 
-          <button type="submit" disabled={submitting || checking || !canSubmit || !unitId} className="action" style={{ width: "100%", justifyContent: "center" }}>
+          {photoLimit > 0 && <div className={styles.section}>
+            <div className={styles.heading}><strong>Photos of the issue</strong><span>{photos.length}/{photoLimit}</span></div>
+            <p className={styles.hint}>Optional. Add up to {photoLimit} JPG, PNG, or WebP {photoLimit === 1 ? "photo" : "photos"}. We resize them automatically before upload.</p>
+            {photos.length < photoLimit && <label className={styles.picker} aria-disabled={photoBusy || submitting}>
+              <ImagePlus size={17}/> Add photos
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={photoBusy || submitting} onChange={event => { void handlePhotos(event.target.files); event.target.value = ""; }}/>
+            </label>}
+            {photoBusy && <p className={styles.processing}>Preparing photos…</p>}
+            {photoError && <p className="notice error" role="alert">{photoError}</p>}
+            {photos.length > 0 && <div className={styles.previews}>{photos.map((photo, index) => <div className={styles.preview} key={`${photo.name}-${index}`}><img src={photo.dataUrl} alt={`Attachment ${index + 1}`} /><button type="button" aria-label={`Remove photo ${index + 1}`} disabled={photoBusy || submitting} onClick={() => setPhotos(current => current.filter((_, position) => position !== index))}><X size={15}/></button></div>)}</div>}
+          </div>}
+
+          <button type="submit" disabled={submitting || checking || photoBusy || !canSubmit || !unitId} className="action" style={{ width: "100%", justifyContent: "center" }}>
             {checking ? "Checking warranty…" : submitting ? "Submitting…" : "Submit claim"}
           </button>
         </form>

@@ -33,8 +33,8 @@ export default async function RegisterPage({ params, searchParams }: Props) {
     where: { serialNumber, brandId: product.brandId, productModelId: product.id },
     include: { purchaseOrder: true, registration: true },
   }) : null;
-  const unit = found && found.purchaseOrder.brandId === product.brandId ? found : null;
-  const delivered = unit?.purchaseOrder.deliveredOn;
+  const unit = found && found.purchaseOrder?.brandId === product.brandId ? found : null;
+  const delivered = unit?.purchaseOrder?.deliveredOn;
   const eligible = !!delivered && dateOnly(delivered).getTime() <= dateOnly(new Date()).getTime();
   const checkError = serialNumber ? !unit ? "not-found" : !eligible ? "not-delivered" : undefined : undefined;
   const error = query.error || checkError;
@@ -60,7 +60,7 @@ export default async function RegisterPage({ params, searchParams }: Props) {
         <dl className={styles.facts}>
           <div className={styles.fact}><dt>Product</dt><dd>{product.name}</dd></div>
           <div className={styles.fact}><dt>Unit ID</dt><dd>{unit.serialNumber}</dd></div>
-          <div className={styles.fact}><dt>Order reference</dt><dd>{unit.purchaseOrder.orderNumber}</dd></div>
+          <div className={styles.fact}><dt>Order reference</dt><dd>{unit.purchaseOrder?.orderNumber}</dd></div>
           <div className={styles.fact}><dt>Delivered</dt><dd>{formatDate(delivered)}</dd></div>
           <div className={styles.fact}><dt>Coverage ends</dt><dd>{formatDate(unit.registration?.coverageEndsOn || addCalendarMonths(delivered, product.warrantyMonths))}</dd></div>
         </dl>

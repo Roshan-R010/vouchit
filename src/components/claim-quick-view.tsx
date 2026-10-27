@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { formatDate } from "@/lib/dates";
 import { ProductPhoto } from "@/components/product-photo";
 import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { ClaimEvidence } from "@/components/claim-evidence";
 import { Link } from "react-router-dom";
 import { GripHorizontal, Maximize2, X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -61,7 +62,7 @@ export function ClaimQuickView({ sessionId, claimId, onClose }: Props) {
     setLoading(true);
     setClaim(null);
     setTab("overview");
-    apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}`)
+    apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}`, { cache: "no-store" })
       .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || "Could not load claim."); return data; })
       .then((data) => { if (active) { setClaim(data.claim); setError(""); setLoading(false); } })
       .catch((cause) => { if (active) { setError(cause instanceof Error ? cause.message : "Could not load claim."); setLoading(false); } });
@@ -81,7 +82,8 @@ export function ClaimQuickView({ sessionId, claimId, onClose }: Props) {
           <dl className={styles.facts}><div><dt>Customer</dt><dd>{customer?.name}</dd></div><div><dt>Issue</dt><dd>{claim.issueTitle}</dd></div><div><dt>Serial number</dt><dd>{claim.registration.unit.serialNumber}</dd></div></dl>
           {claim.issueTags?.length > 0 && <div className={styles.tags}>{claim.issueTags.map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
           <div className={styles.description}><strong>Description</strong><p>{claim.description}</p></div>
-          <div className={styles.description}><strong>Evidence</strong><p>{claim.attachments?.length ? `${claim.attachments.length} attachment${claim.attachments.length === 1 ? "" : "s"} — open full claim to review` : "No photos attached to this claim."}</p></div>
+          <div className={styles.description}><strong>Evidence</strong><ClaimEvidence sessionId={sessionId} claimId={claimId} attachments={claim.attachments || []} compact /></div>
+          {claim.status === "APPROVED" && <div className={styles.description}><strong>Customer address</strong><p>{claim.addressRequest?.receivedAt ? "Address received. Open the full claim to view it." : claim.addressRequest ? "Address still not received." : "Address not requested yet."}</p></div>}
         </>}
         {tab === "customer" && <dl className={styles.facts}><div><dt>Name</dt><dd>{customer?.name}</dd></div><div><dt>Email</dt><dd>{customer?.email}</dd></div><div><dt>Product</dt><dd>{product?.name}</dd></div><div><dt>Coverage ends</dt><dd>{formatDate(claim.registration.coverageEndsOn)}</dd></div></dl>}
         {tab === "timeline" && <ol className={styles.timeline}>{claim.events?.map((event: any) => <li key={event.id}><strong>{event.note || event.toStatus}</strong><time>{formatDate(event.createdAt)}</time></li>)}</ol>}

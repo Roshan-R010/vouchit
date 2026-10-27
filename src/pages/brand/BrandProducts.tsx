@@ -16,7 +16,7 @@ export function BrandProducts() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [editing, setEditing] = useState<any>(null);
 
-  const visible = useMemo(() => products.filter((product) => `${product.name} ${product.sku || ""}`.toLowerCase().includes(search.trim().toLowerCase()) && (filter === "all" || (filter === "registered" ? product.units?.some((unit: any) => unit.registration) : !product.units?.length))), [products, search, filter]);
+  const visible = useMemo(() => products.filter((product) => `${product.name} ${product.sku || ""}`.toLowerCase().includes(search.trim().toLowerCase()) && (filter === "all" || (filter === "registered" ? product.registeredCount > 0 : product.unitCount === 0))), [products, search, filter]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -35,7 +35,7 @@ export function BrandProducts() {
   }, [sessionId]);
 
   return <div className={styles.page}>
-    <div className="business-page-header"><div><h1>Products</h1><p>Manage product models, warranty periods, and registration links.</p></div><Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">Add product</Link></div>
+    <div className="business-page-header"><div><h1>Products</h1><p>Manage product models, warranty periods, and registration links.</p></div><div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}><Link to={`/demo/${sessionId}/brand/products/import`} className="business-button">Import units</Link><Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">Add product</Link></div></div>
     <div className={styles.toolbar}>
       <label className={styles.search}><Search size={17}/><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" aria-label="Search products"/></label>
       <label className={styles.filter}><span className="sr-only">Filter products</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All products</option><option value="registered">Registered units</option><option value="empty">No units yet</option></select><ChevronDown size={15}/></label>
@@ -45,7 +45,7 @@ export function BrandProducts() {
       <div className={view === "grid" ? styles.grid : styles.list}>
         {visible.map((product) => <article className={styles.card} key={product.id}>
           <div className={styles.photo}>{product.imageUrl ? <ProductPhoto src={product.imageUrl} alt={product.name}/> : <Package size={44} strokeWidth={1.4}/>}<button type="button" className={styles.editPhoto} onClick={() => setEditing(product)} aria-label={`Change image for ${product.name}`} title="Change image"><ImagePlus size={17}/></button></div>
-          <div className={styles.details}><Link className={styles.name} to={`/demo/${sessionId}/brand/products/${product.id}`}>{product.name}</Link><span className={styles.sku}>SKU: {product.sku || "Not set"}</span><span className={styles.warranty}>{product.warrantyMonths}m warranty</span><div className={styles.footer}><span>{(product.units?.length || 0).toLocaleString()} {product.units?.length === 1 ? "unit" : "units"}</span><Link to={`/demo/${sessionId}/brand/products/${product.id}`} aria-label={`Manage ${product.name}`}><ChevronRight size={21}/></Link></div></div>
+          <div className={styles.details}><Link className={styles.name} to={`/demo/${sessionId}/brand/products/${product.id}`}>{product.name}</Link><span className={styles.sku}>SKU: {product.sku || "Not set"}</span><span className={styles.warranty}>{product.warrantyMonths}m warranty</span><div className={styles.footer}><span>{(product.unitCount || 0).toLocaleString()} {product.unitCount === 1 ? "unit" : "units"} · {product.registeredCount || 0} registered</span><Link to={`/demo/${sessionId}/brand/products/${product.id}`} aria-label={`Manage ${product.name}`}><ChevronRight size={21}/></Link></div></div>
         </article>)}
       </div>}
     {editing && sessionId && <ProductImageEditor sessionId={sessionId} productId={editing.id} productName={editing.name} imageUrl={editing.imageUrl} onClose={() => setEditing(null)} onSaved={(url) => { setProducts((current) => current.map((product) => product.id === editing.id ? { ...product, imageUrl: url } : product)); setEditing(null); }}/ >}

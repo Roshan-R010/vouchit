@@ -141,8 +141,8 @@ export default async function NewClaimPage({ params, searchParams }: Props) {
               </strong>
               <p>
                 Unit {registration.unit.serialNumber} · Delivered{" "}
-                {registration.unit.purchaseOrder.deliveredOn
-                  ? formatDate(registration.unit.purchaseOrder.deliveredOn)
+                {registration.unit.purchaseOrder!.deliveredOn
+                  ? formatDate(registration.unit.purchaseOrder!.deliveredOn)
                   : "—"}{" "}
                 · Covered through {formatDate(registration.coverageEndsOn)}
               </p>

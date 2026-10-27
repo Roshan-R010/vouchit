@@ -80,6 +80,7 @@ model Brand {
   products      ProductModel[]
   orders        PurchaseOrder[]
   units         ProductUnit[]
+  unitImports   UnitImport[]
   @@unique([demoSessionId, slug])
 }
 
@@ -91,7 +92,9 @@ model ProductModel {
   sku            String?
   imageUrl       String?
   warrantyMonths Int          @default(36)
+  claimPhotoLimit Int          @default(3)
   issueTags      String[]     @default([])
+  verificationMode RegistrationVerificationMode @default(UNIT_ONLY)
   brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
   units          ProductUnit[]
   @@unique([brandId, slug])
@@ -128,14 +131,38 @@ model ProductUnit {
   id             String               @id @default(uuid()) @db.Uuid
   brandId        String               @db.Uuid
   productModelId String               @db.Uuid
-  purchaseOrderId String              @db.Uuid
+  purchaseOrderId String?             @db.Uuid
   serialNumber   String
   createdAt      DateTime             @default(now())
   brand          Brand                @relation(fields: [brandId], references: [id], onDelete: Cascade)
   productModel   ProductModel         @relation(fields: [productModelId], references: [id], onDelete: Cascade)
-  purchaseOrder  PurchaseOrder        @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder  PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   registration   WarrantyRegistration?
   @@unique([brandId, serialNumber])
+  @@index([brandId, productModelId])
+  @@index([brandId, purchaseOrderId])
+}
+
+enum RegistrationVerificationMode {
+  UNIT_ONLY
+  ORDER_ONLY
+  ORDER_AND_UNIT
+}
+
+model UnitImport {
+  id           String   @id @default(uuid()) @db.Uuid
+  brandId      String   @db.Uuid
+  accountId    String?  @db.Uuid
+  filename     String
+  status       String
+  totalRows    Int
+  insertedRows Int      @default(0)
+  skippedRows  Int      @default(0)
+  failedRows   Int      @default(0)
+  summary      String?
+  createdAt    DateTime @default(now())
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  @@index([brandId, createdAt])
 }
 
 model WarrantyRegistration {
@@ -162,6 +189,7 @@ model WarrantyClaim {
   resolutionMethod ResolutionMethod?
   registration   WarrantyRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   attachments    ClaimAttachment[]
+  addressRequest ClaimAddress?
   messages       ClaimMessage[]
   events         ClaimEvent[]
   @@index([status])
@@ -174,6 +202,22 @@ model ClaimAttachment {
   fileKey   String
   createdAt DateTime     @default(now())
   claim     WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+}
+
+model ClaimAddress {
+  id          String        @id @default(uuid()) @db.Uuid
+  claimId     String        @unique @db.Uuid
+  requestedAt DateTime      @default(now())
+  receivedAt  DateTime?
+  recipient   String?
+  line1       String?
+  line2       String?
+  city        String?
+  region      String?
+  postalCode  String?
+  country     String?
+  phone       String?
+  claim       WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
 }
 
 model ClaimMessage {

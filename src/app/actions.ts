@@ -27,12 +27,12 @@ export async function registerWarrantyAction(formData: FormData) {
   });
   if (!unit) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-found`);
   const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId, email } });
-  if (unit.productModel.brandId !== unit.brandId || unit.purchaseOrder.brandId !== unit.brandId || (unit.purchaseOrder.customerId && customer && unit.purchaseOrder.customerId !== customer.id)) fail("not-found");
+  if (unit.productModel.brandId !== unit.brandId || !unit.purchaseOrder || unit.purchaseOrder.brandId !== unit.brandId || (unit.purchaseOrder.customerId && customer && unit.purchaseOrder.customerId !== customer.id)) fail("not-found");
   if (unit.registration) {
     if (!customer || unit.registration.customerId !== customer.id) fail("not-found");
     redirect(`/demo/${sessionId}/customer/products/${unit.id}?notice=already-registered`);
   }
-  const deliveredOn = unit.purchaseOrder.deliveredOn;
+  const deliveredOn = unit.purchaseOrder?.deliveredOn;
   if (!deliveredOn || dateOnly(deliveredOn).getTime() > dateOnly(new Date()).getTime()) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-delivered`);
   const start = dateOnly(deliveredOn);
   const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
@@ -70,7 +70,7 @@ export async function submitClaimAction(formData: FormData) {
     where: { unitId, customer: { demoSessionId: sessionId }, unit: { brand: { demoSessionId: sessionId } } },
     include: { claim: { select: { id: true } }, unit: { include: { productModel: true, brand: true, purchaseOrder: true } }, customer: true },
   });
-  if (!registration || registration.unit.productModel.brandId !== registration.unit.brandId || registration.unit.purchaseOrder.brandId !== registration.unit.brandId) redirect(`/demo/${sessionId}/customer?error=registration-required`);
+  if (!registration || registration.unit.productModel.brandId !== registration.unit.brandId || !registration.unit.purchaseOrder || registration.unit.purchaseOrder.brandId !== registration.unit.brandId) redirect(`/demo/${sessionId}/customer?error=registration-required`);
   if (registration.claim) redirect(`/demo/${sessionId}/customer/claims/${registration.claim.id}`);
   if (!isCoverageActive(registration.coverageEndsOn) || dateOnly(registration.coverageStartsOn).getTime() > dateOnly(new Date()).getTime()) redirect(`${claimPath}&error=expired`);
   const reference = `VCH-${submissionId.replaceAll("-", "").toUpperCase()}`;

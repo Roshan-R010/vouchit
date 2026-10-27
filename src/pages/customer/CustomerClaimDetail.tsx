@@ -1,9 +1,23 @@
 import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { ClaimEvidence } from "@/components/claim-evidence";
 import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { formatDate } from "@/lib/dates";
+
+type AddressDraft = { recipient: string; line1: string; line2: string; city: string; region: string; postalCode: string; country: string; phone: string };
+const emptyAddress: AddressDraft = { recipient: "", line1: "", line2: "", city: "", region: "", postalCode: "", country: "", phone: "" };
+const addressFields: { key: keyof AddressDraft; label: string; required: boolean; autocomplete: string }[] = [
+  { key: "recipient", label: "Full name", required: true, autocomplete: "name" },
+  { key: "line1", label: "Address line 1", required: true, autocomplete: "address-line1" },
+  { key: "line2", label: "Address line 2", required: false, autocomplete: "address-line2" },
+  { key: "city", label: "City", required: true, autocomplete: "address-level2" },
+  { key: "region", label: "State or region", required: true, autocomplete: "address-level1" },
+  { key: "postalCode", label: "Postal code", required: true, autocomplete: "postal-code" },
+  { key: "country", label: "Country", required: true, autocomplete: "country-name" },
+  { key: "phone", label: "Phone number (optional)", required: false, autocomplete: "tel" },
+];
 
 export function CustomerClaimDetail() {
   const { sessionId, claimId } = useParams<{ sessionId: string; claimId: string }>();
@@ -12,20 +26,41 @@ export function CustomerClaimDetail() {
   const [replyMessage, setReplyMessage] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [address, setAddress] = useState<AddressDraft>(emptyAddress);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [submittingAddress, setSubmittingAddress] = useState(false);
 
   const loadClaim = () => {
     if (!sessionId || !claimId) return;
     setLoading(true);
-    apiFetch(`/api/demo/${sessionId}/customer/claims/${claimId}`)
+    apiFetch(`/api/demo/${sessionId}/customer/claims/${claimId}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         setClaim(data.claim);
+        if (data.claim?.addressRequest) {
+          setAddress(Object.fromEntries(Object.keys(emptyAddress).map(key => [key, data.claim.addressRequest[key] || ""])) as AddressDraft);
+          setEditingAddress(!data.claim.addressRequest.receivedAt);
+        }
         setLoading(false);
       })
       .catch((err) => {
         console.error("Failed to load claim:", err);
         setLoading(false);
       });
+  };
+
+  const handleAddressSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!sessionId || !claimId || submittingAddress) return;
+    setSubmittingAddress(true); setNotice(null);
+    try {
+      const response = await apiFetch(`/api/demo/${sessionId}/customer/claims/${claimId}/address`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(address) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save your address.");
+      setNotice("Your address has been shared with the brand for this claim.");
+      loadClaim();
+    } catch (cause) { setNotice(cause instanceof Error ? cause.message : "Could not save your address."); }
+    finally { setSubmittingAddress(false); }
   };
 
   useEffect(() => {
@@ -154,6 +189,11 @@ export function CustomerClaimDetail() {
         </div>
       )}
 
+      {claim.addressRequest && (status === "APPROVED" || status === "RESOLVED") && <section className="claim-info" style={{ marginBottom: 24 }}><h3>{claim.addressRequest.receivedAt ? "Address shared with the brand" : "Address requested"}</h3><p style={{ fontSize: 15, lineHeight: 1.6 }}>Your {unit.brand.name} claim was approved for {claim.resolutionMethod === "REPLACEMENT" ? "replacement" : "repair"}. {claim.addressRequest.receivedAt ? "The brand can now see the address below." : "Please provide the address needed to arrange the next step."}</p>
+        {claim.addressRequest.receivedAt && !editingAddress && <><address style={{ fontStyle: "normal", lineHeight: 1.7, marginBottom: 14 }}>{address.recipient}<br/>{address.line1}<br/>{address.line2 && <>{address.line2}<br/></>}{address.city}, {address.region} {address.postalCode}<br/>{address.country}{address.phone && <><br/>{address.phone}</>}</address>{status === "APPROVED" && <button type="button" className="action secondary" onClick={() => setEditingAddress(true)}>Edit address</button>}</>}
+        {status === "APPROVED" && editingAddress && <form onSubmit={handleAddressSubmit} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 14 }}>{addressFields.map(field => <div className="field" key={field.key} style={{ margin: 0 }}><label htmlFor={`claim-address-${field.key}`}>{field.label}</label><input id={`claim-address-${field.key}`} type="text" autoComplete={field.autocomplete} value={address[field.key]} required={field.required} maxLength={field.key === "line1" || field.key === "line2" ? 200 : field.key === "recipient" ? 120 : field.key === "postalCode" || field.key === "phone" ? 30 : 100} onChange={event => setAddress(current => ({ ...current, [field.key]: event.target.value }))}/></div>)}<div style={{ gridColumn: "1 / -1", display: "flex", gap: 10 }}><button type="submit" className="action" disabled={submittingAddress}>{submittingAddress ? "Saving…" : "Share address with brand"}</button>{claim.addressRequest.receivedAt && <button type="button" className="action secondary" onClick={() => setEditingAddress(false)}>Cancel</button>}</div></form>}
+      </section>}
+
       {/* Claim Summary & History */}
       <div className="claim-info">
         <h3>Claim Particulars</h3>
@@ -174,6 +214,7 @@ export function CustomerClaimDetail() {
           <span>Original Description</span>
           <span>{claim.description}</span>
         </div>
+        <div style={{ marginTop: 18 }}><strong>Your photos</strong><ClaimEvidence sessionId={sessionId!} claimId={claimId!} attachments={claim.attachments || []} /></div>
       </div>
 
       {/* Activity Log */}

@@ -1,10 +1,13 @@
 import { ClaimStatusBadge } from "@/components/claim-status-badge";
+import { ClaimEvidence } from "@/components/claim-evidence";
 import { ProductPhoto } from "@/components/product-photo";
 import { apiFetch } from "@/lib/api-fetch";
 import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar } from "lucide-react";
+import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar, ChevronDown } from "lucide-react";
 import { formatDate } from "@/lib/dates";
+import historyStyles from "./claim-history.module.css";
+import styles from "./claim-detail.module.css";
 
 const claimStatusLabel: Record<string, string> = {
   SUBMITTED: "New / Needs Review",
@@ -36,15 +39,17 @@ export function BrandClaimDetail() {
   const [decision, setDecision] = useState<string>("approve");
   const [note, setNote] = useState<string>("");
   const [resolutionMethod, setResolutionMethod] = useState<string>("REPAIR");
+  const [requestingAddress, setRequestingAddress] = useState(false);
 
   const loadClaim = () => {
     if (!sessionId || !claimId) return;
     setLoading(true);
-    apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}`)
+    apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.claim) {
           setClaim(data.claim);
+          setResolutionMethod(data.claim.resolutionMethod || "REPAIR");
           // Set default decision based on status
           if (data.claim.status === "SUBMITTED") setDecision("review");
           else if (data.claim.status === "UNDER_REVIEW") setDecision(["approve", "request_info", "reject"].includes(searchParams.get("decision") || "") ? searchParams.get("decision")! : "approve");
@@ -76,7 +81,7 @@ export function BrandClaimDetail() {
         body: JSON.stringify({
           decision,
           note,
-          resolutionMethod: decision === "resolve" ? resolutionMethod : undefined,
+          resolutionMethod: decision === "resolve" || decision === "approve" ? resolutionMethod : undefined,
         }),
       });
 
@@ -93,6 +98,19 @@ export function BrandClaimDetail() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const requestAddress = async () => {
+    if (!sessionId || !claimId || requestingAddress) return;
+    setRequestingAddress(true); setError(null); setSuccess(null);
+    try {
+      const response = await apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}/request-address`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resolutionMethod }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not request the address.");
+      setSuccess("Address requested from the customer.");
+      loadClaim();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not request the address."); }
+    finally { setRequestingAddress(false); }
   };
 
   if (loading) {
@@ -129,40 +147,30 @@ export function BrandClaimDetail() {
   const status = claim.status;
 
   return (
-    <div>
-      <Link to={`/demo/${sessionId}/brand/claims`} className="business-back">
-        <ArrowLeft size={14} /> Back to claims inbox
-      </Link>
-
-      <div className="business-page-header" style={{ marginBottom: "20px" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-            <span className="business-eyebrow" style={{ margin: 0 }}>
-              CLAIM {claim.reference}
-            </span>
-            <ClaimStatusBadge status={status}/>
-          </div>
-          <h1>{claim.issueTitle}</h1>
-          <p>
-            Submitted by {customer.name} on {formatDate(claim.submittedAt)}
-          </p>
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.headerTop}>
+          <Link to={`/demo/${sessionId}/brand/claims`} className={styles.back}><ArrowLeft size={16} /> Back to claims</Link>
+          <div className={styles.reference}><span>Claim {claim.reference}</span><ClaimStatusBadge status={status}/></div>
         </div>
-      </div>
+        <div className={styles.titleRow}><h1>{claim.issueTitle}</h1><p>Submitted by {customer.name} on {formatDate(claim.submittedAt)}</p></div>
+      </header>
 
       {success && <div className="business-notice">{success}</div>}
       {error && <div className="business-notice error">{error}</div>}
 
-      <div className="business-two-columns">
+      <div className={styles.columns}>
         {/* Left Column: Details, Unit, Events */}
-        <div>
+        <div className={styles.column}>
           {/* Issue Statement */}
           <div className="business-panel">
             <div className="business-panel-header">
               <h2>Customer Statement</h2>
             </div>
-            <div style={{ padding: "20px 22px", fontSize: "15px", lineHeight: "1.7", color: "#373e35" }}>
+            <div className={styles.panelBody}>
               <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{claim.description}</p>
-              {claim.issueTags?.length > 0 && <div className="claim-selected-tags"><h3>Reported issues</h3><div className="issue-tag-list">{claim.issueTags.map((tag: string) => <span className="issue-tag" key={tag}>{tag}</span>)}</div></div>}
+              {claim.issueTags?.length > 0 && <div className={styles.reportedIssues}><strong>Reported issues</strong><div className="issue-tag-list">{claim.issueTags.map((tag: string) => <span className="issue-tag" key={tag}>{tag}</span>)}</div></div>}
+              <div className={styles.evidence}><strong>Customer photos</strong><ClaimEvidence sessionId={sessionId!} claimId={claimId!} attachments={claim.attachments || []} /></div>
             </div>
           </div>
 
@@ -171,47 +179,24 @@ export function BrandClaimDetail() {
             <div className="business-panel-header">
               <h2>Product & Delivery Record</h2>
             </div>
-            <div style={{ padding: "18px 22px" }}>
-              {unit.productModel.imageUrl && <div style={{ width: 140, height: 140, marginBottom: 20, background: "#eef3f7", borderRadius: 8, overflow: "hidden" }}><ProductPhoto src={unit.productModel.imageUrl} alt={unit.productModel.name}/></div>}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "14px" }}>
-                <div>
-                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Model</div>
-                  <strong style={{ fontSize: "15px", color: "#242a25" }}>{unit.productModel.name}</strong>
-                  <div style={{ color: "#7a8276", marginTop: "2px" }}>SKU: {unit.productModel.sku || "N/A"}</div>
-                </div>
-
-                <div>
-                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Stamped Unit ID</div>
-                  <strong className="business-mono" style={{ fontSize: "15px", color: "#242a25" }}>
-                    {unit.serialNumber}
-                  </strong>
-                </div>
-
-                <div>
-                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Purchase Order</div>
-                  <div className="business-mono" style={{ fontSize: "14px", color: "#242a25", fontWeight: 600 }}>
-                    {unit.purchaseOrder.orderNumber}
-                  </div>
-                  <div style={{ color: "#7a8276", fontSize: "14px" }}>
-                    Delivered: {unit.purchaseOrder.deliveredOn ? formatDate(unit.purchaseOrder.deliveredOn) : "N/A"}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700, textTransform: "uppercase" }}>Warranty Duration</div>
-                  <div style={{ fontSize: "14px", color: "#242a25", fontWeight: 600 }}>{unit.productModel.warrantyMonths} Months Coverage</div>
-                  <div style={{ color: "#7a8276", fontSize: "14px" }}>Through: {formatDate(claim.registration.coverageEndsOn)}</div>
-                </div>
-              </div>
+            <div className={styles.productRecord} data-has-image={!!unit.productModel.imageUrl}>
+              {unit.productModel.imageUrl && <div className={styles.productImage}><ProductPhoto src={unit.productModel.imageUrl} alt={unit.productModel.name}/></div>}
+              <dl className={styles.productFacts}>
+                <div><dt>Model</dt><dd><strong>{unit.productModel.name}</strong><span>SKU: {unit.productModel.sku || "N/A"}</span></dd></div>
+                <div><dt>Stamped unit ID</dt><dd>{unit.serialNumber}</dd></div>
+                <div><dt>Purchase order</dt><dd>{unit.purchaseOrder.orderNumber}<span>Delivered: {unit.purchaseOrder.deliveredOn ? formatDate(unit.purchaseOrder.deliveredOn) : "N/A"}</span></dd></div>
+                <div><dt>Warranty</dt><dd>{unit.productModel.warrantyMonths} months<span>Through: {formatDate(claim.registration.coverageEndsOn)}</span></dd></div>
+              </dl>
             </div>
           </div>
 
           {/* Activity / Event Timeline */}
-          <div className="business-panel">
-            <div className="business-panel-header">
+          <details key={claim.id} className={`business-panel ${historyStyles.panel}`}>
+            <summary className={`business-panel-header ${historyStyles.toggle}`}>
               <h2>History & Transition Events</h2>
-            </div>
-            <div style={{ padding: "20px 22px" }}>
+              <ChevronDown size={20} aria-hidden="true" />
+            </summary>
+            <div className={styles.panelBody}>
               <div style={{ display: "grid", gap: "16px" }}>
                 {claim.events?.map((ev: any, idx: number) => (
                   <div key={ev.id || idx} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
@@ -238,18 +223,17 @@ export function BrandClaimDetail() {
                 ))}
               </div>
             </div>
-          </div>
+          </details>
         </div>
 
         {/* Right Column: Actions */}
-        <div>
+        <div className={styles.column}>
           <div className="business-panel">
             <div className="business-panel-header">
               <h2>Review & decision</h2>
-              <ClaimStatusBadge status={status}/>
             </div>
 
-            <div style={{ padding: "20px 22px" }}>
+            <div className={styles.panelBody}>
               {status === "RESOLVED" && (
                 <div style={{ textAlign: "center", padding: "16px 0", color: "#4e8050" }}>
 
@@ -313,6 +297,8 @@ export function BrandClaimDetail() {
                         </select>
                       </div>
 
+                      {decision === "approve" && <div className="business-field"><label>Planned resolution</label><select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)} required><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></select><p className="business-hint">Approving will ask the customer for a delivery or collection address.</p></div>}
+
                       <div className="business-field">
                         <label>
                           {decision === "request_info"
@@ -358,27 +344,9 @@ export function BrandClaimDetail() {
 
                   {status === "APPROVED" && (
                     <div>
-                      <p style={{ fontSize: "14px", color: "#636d5e", lineHeight: 1.6, marginBottom: "14px" }}>
-                        This claim is approved. Specify how the warranty obligation is fulfilled.
+                      <p className={styles.plan}>
+                        <strong>{claim.resolutionMethod === "REPLACEMENT" ? "Replacement" : "Repair"} approved.</strong> {claim.addressRequest?.receivedAt ? "Record the outcome once completed." : "Waiting for the customer’s address."}
                       </p>
-
-                      <div className="business-field">
-                        <label>Resolution Method *</label>
-                        <select
-                          value={resolutionMethod}
-                          onChange={(e) => setResolutionMethod(e.target.value)}
-                          style={{
-                            padding: "9px 12px",
-                            fontSize: "14px",
-                            border: "1px solid #dde3d6",
-                            borderRadius: "6px",
-                            outline: 0,
-                          }}
-                        >
-                          <option value="REPAIR">Repair</option>
-                          <option value="REPLACEMENT">Replacement</option>
-                        </select>
-                      </div>
 
                       <div className="business-field">
                         <label>Outcome Details *</label>
@@ -391,8 +359,8 @@ export function BrandClaimDetail() {
                         />
                       </div>
 
-                      <button type="submit" disabled={submitting} className="business-button primary" style={{ width: "100%" }}>
-                        {submitting ? "Resolving..." : "Mark as Resolved"}
+                      <button type="submit" disabled={submitting || !claim.addressRequest?.receivedAt} className="business-button primary" style={{ width: "100%" }}>
+                        {submitting ? "Resolving..." : claim.addressRequest?.receivedAt ? "Mark as Resolved" : "Waiting for customer address"}
                       </button>
                     </div>
                   )}
@@ -404,17 +372,15 @@ export function BrandClaimDetail() {
           {/* Customer Summary Card */}
           <div className="business-panel">
             <div className="business-panel-header">
-              <h2>Customer Contact</h2>
+              <h2>Customer details</h2>
+              {(status === "APPROVED" || status === "RESOLVED") && <span className={`business-badge ${claim.addressRequest?.receivedAt ? "success" : ""}`}>{claim.addressRequest?.receivedAt ? "Address received" : claim.addressRequest ? "Address still not received" : "Address not requested"}</span>}
             </div>
-            <div style={{ padding: "18px 22px", fontSize: "14px" }}>
-              <div style={{ marginBottom: "10px" }}>
-                <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700 }}>NAME</div>
-                <strong style={{ color: "#242a25" }}>{customer.name}</strong>
-              </div>
-              <div>
-                <div style={{ color: "#596258", fontSize: "14px", fontWeight: 700 }}>EMAIL</div>
-                <div style={{ color: "#555e50" }}>{customer.email}</div>
-              </div>
+            <div className={styles.panelBody}>
+              <dl className={styles.contact}><div><dt>Name</dt><dd>{customer.name}</dd></div><div><dt>Email</dt><dd>{customer.email}</dd></div></dl>
+              {(status === "APPROVED" || status === "RESOLVED") && <section className={styles.address} aria-label="Customer address">
+                <h3>Delivery / collection address</h3>
+                {claim.addressRequest?.receivedAt ? <address><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address> : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p> : <><p>This claim has no address request.</p>{status === "APPROVED" && <>{!claim.resolutionMethod && <div className="business-field"><label>Planned resolution</label><select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></select></div>}<button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button></>}</>}
+              </section>}
             </div>
           </div>
         </div>

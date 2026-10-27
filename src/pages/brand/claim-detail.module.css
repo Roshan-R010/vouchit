@@ -1,0 +1,61 @@
+:global(.brand-shell[data-claim-detail="true"] .business-topbar) { height: 56px; }
+:global(.brand-shell[data-claim-detail="true"] .business-content) { padding-top: 18px; padding-bottom: 28px; }
+.page { min-width: 0; color: #23313e; }
+.header { margin-bottom: 18px; }
+.headerTop { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; }
+.back { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; flex-shrink: 0; color: #526576; font-size: 14px; font-weight: 550; text-decoration: none; }
+.back:hover { color: #172c3e; }
+.back:focus-visible { outline: 2px solid #315c80; outline-offset: 3px; border-radius: 3px; }
+.reference { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.reference > span { min-width: 0; overflow-wrap: anywhere; font-size: 12px; font-weight: 650; color: #5b6b79; }
+.titleRow { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 24px; margin-top: 8px; }
+.titleRow h1 { min-width: 0; margin: 0; font-size: 30px; font-weight: 700; line-height: 1.25; letter-spacing: -.8px; color: #182633; overflow-wrap: anywhere; }
+.titleRow p { margin: 0; color: #5b6b79; font-size: 14px; line-height: 1.5; }
+.columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr); gap: 18px; align-items: start; }
+.column { display: grid; gap: 16px; min-width: 0; align-content: start; }
+.page :global(.business-panel) { margin-bottom: 0; min-width: 0; }
+.page :global(.business-panel-header) { padding: 14px 18px; gap: 10px; flex-wrap: wrap; }
+.page :global(.business-panel-header h2) { font-size: 17px; line-height: 1.4; }
+.page :global(.business-field) { margin-bottom: 14px; }
+.page :global(.business-field textarea) { min-height: 92px; }
+.page :global(.business-button) { white-space: normal; }
+.panelBody { padding: 16px 18px; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.reportedIssues { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 14px; }
+.reportedIssues > strong, .evidence > strong { font-size: 14px; }
+.evidence { margin-top: 14px; }
+.evidence > div { margin-top: 8px; }
+.productRecord { display: grid; grid-template-columns: 108px minmax(0, 1fr); align-items: center; gap: 18px; padding: 16px 18px; }
+.productRecord[data-has-image="false"] { grid-template-columns: minmax(0, 1fr); }
+.productImage { width: 108px; height: 132px; background: #eff3f6; border: 1px solid #e4e9ee; border-radius: 7px; overflow: hidden; }
+.productFacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 0; }
+.productFacts dt, .contact dt { color: #62717e; font-size: 13px; font-weight: 550; line-height: 1.4; margin-bottom: 4px; }
+.productFacts dd, .contact dd { margin: 0; font-size: 15px; font-weight: 550; line-height: 1.4; overflow-wrap: anywhere; }
+.productFacts dd span { display: block; margin-top: 3px; color: #657381; font-size: 13px; font-weight: 400; }
+.plan { margin: 0 0 14px; color: #576777; font-size: 14px; }
+.plan strong { color: #273b4b; }
+.contact { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 0; }
+.contact > div { min-width: 0; }
+.address { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e6ebf0; }
+.address h3 { font-size: 13px; color: #62717e; font-weight: 550; margin: 0 0 6px; }
+.address address { font-style: normal; line-height: 1.5; overflow-wrap: anywhere; }
+.address p { margin: 0 0 12px; }
+@media (max-width: 1150px) {
+  .columns { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); }
+  .productRecord { grid-template-columns: minmax(0, 1fr); }
+  .productImage { width: 96px; height: 100px; }
+}
+@media (max-width: 960px) {
+  .columns { grid-template-columns: minmax(0, 1fr); }
+  .productRecord { grid-template-columns: 108px minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  :global(.brand-shell[data-claim-detail="true"] .business-content) { padding: 14px 12px 24px; }
+  .headerTop { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .reference { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+  .titleRow h1 { font-size: 26px; }
+  .panelBody, .productRecord { padding: 14px; }
+  .page :global(.business-panel-header) { padding: 12px 14px; }
+  .productRecord { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .productFacts { gap: 14px 12px; }
+  .evidence a { width: 110px; height: 110px; }
+}

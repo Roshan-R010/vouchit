@@ -14,7 +14,7 @@ export function CustomerDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(sessionId ? `/api/demo/${sessionId}/customer` : "/api/account/customer")
+    apiFetch(sessionId ? `/api/demo/${sessionId}/customer` : "/api/account/customer", { cache: "no-store" })
       .then((res) => res.json())
       .then((resData) => {
         setData(resData);
@@ -107,6 +107,7 @@ export function CustomerDashboard() {
 
                 <h2>{w.productName}</h2>
                 <p>{w.brandName} · Serial {w.serialNumber}</p>
+                {w.claim?.addressNeeded && <p style={{ color: "#945019", fontWeight: 700, fontSize: 14 }}>Address requested for your claim</p>}
 
                 <div className="warranty-remaining">
                   <strong>{w.isActive ? w.daysRemaining : 0}</strong>
@@ -129,7 +130,7 @@ export function CustomerDashboard() {
 
                   {w.claim ? (
                     <Link to={`/demo/${w.demoSessionId || sessionId}/customer/claims/${w.claim.id}`} className="action">
-                      View claim <ArrowUpRight size={15}/>
+                      {w.claim.addressNeeded ? "Add address" : "View claim"} <ArrowUpRight size={15}/>
                     </Link>
                   ) : w.isActive ? (
                     <Link to={`/demo/${w.demoSessionId || sessionId}/customer/claims/new?unitId=${w.unitId}`} className="action">

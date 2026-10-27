@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 
-type RegistrationProduct = { id: string; name: string; slug: string; imageUrl: string | null; warrantyMonths: number };
+type RegistrationProduct = { id: string; name: string; slug: string; imageUrl: string | null; warrantyMonths: number; verificationMode: "UNIT_ONLY" | "ORDER_ONLY" | "ORDER_AND_UNIT" };
 type RegistrationData = { brand: { name: string; slug: string; logoUrl?: string | null }; product: RegistrationProduct };
 
 export default function CustomerRegisterPortal() {
@@ -19,8 +19,9 @@ export default function CustomerRegisterPortal() {
   const { account } = useAuth();
   const preview = location.state?.registration as RegistrationData | undefined;
   const [data, setData] = useState<RegistrationData | null>(preview && preview.brand.slug === brandSlug && preview.product.slug === productSlug ? preview : null);
-  const [panelOpen, setPanelOpen] = useState(searchParams.has("open") || Boolean(searchParams.get("serialNumber")));
+  const [panelOpen, setPanelOpen] = useState(searchParams.has("open") || Boolean(searchParams.get("serialNumber")) || Boolean(searchParams.get("orderNumber")));
   const [serialNumber, setSerialNumber] = useState(searchParams.get("serialNumber") || "");
+  const [orderNumber, setOrderNumber] = useState(searchParams.get("orderNumber") || "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +42,7 @@ export default function CustomerRegisterPortal() {
     event.preventDefault();
     if (!sessionId || !brandSlug || !productSlug) return;
     if (!account || account.role !== "CUSTOMER") {
-      const returnTo = `${location.pathname}?open=1&serialNumber=${encodeURIComponent(serialNumber)}`;
+      const returnTo = `${location.pathname}?open=1&serialNumber=${encodeURIComponent(serialNumber)}&orderNumber=${encodeURIComponent(orderNumber)}`;
       navigate(`/login/customer?next=${encodeURIComponent(returnTo)}`);
       return;
     }
@@ -49,7 +50,7 @@ export default function CustomerRegisterPortal() {
     try {
       const response = await apiFetch(`/api/demo/${sessionId}/register`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandSlug, productSlug, serialNumber: serialNumber.trim().toUpperCase() }),
+        body: JSON.stringify({ brandSlug, productSlug, serialNumber: serialNumber.trim().toUpperCase(), orderNumber: orderNumber.trim() }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Registration failed. Check your serial number.");
@@ -87,7 +88,8 @@ export default function CustomerRegisterPortal() {
           <div><span className="registration-step">Warranty activation</span><h2>Register your product</h2><p>Enter the details printed on your product or retail box.</p></div>
           {error && <div className="notice error" role="alert">{error}</div>}
           <form onSubmit={handleSubmit}>
-            <label>Serial number<input autoFocus type="text" placeholder="Enter the serial number" value={serialNumber} onChange={e => setSerialNumber(e.target.value.toUpperCase())} required={account?.role === "CUSTOMER"}/><small>Usually printed beside the barcode on the product or box.</small></label>
+            {product.verificationMode !== "UNIT_ONLY" && <label>Order ID<input autoFocus type="text" placeholder="Enter the Order ID" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} required={account?.role === "CUSTOMER"} maxLength={120}/><small>Use the Order ID supplied with your purchase.</small></label>}
+            {product.verificationMode !== "ORDER_ONLY" && <label>{product.verificationMode === "UNIT_ONLY" ? "Serial number" : "Unit ID"}<input autoFocus={product.verificationMode === "UNIT_ONLY"} type="text" placeholder="Enter the Unit ID" value={serialNumber} onChange={e => setSerialNumber(e.target.value.toUpperCase())} required={account?.role === "CUSTOMER"} maxLength={120}/><small>Usually printed beside the barcode on the product or box.</small></label>}
             <button className="registration-submit" type="submit" disabled={submitting}>{submitting ? "Checking your product…" : <>{account?.role === "CUSTOMER" ? "Register warranty" : "Sign in to register"} <ArrowRight size={18}/></>}</button>
           </form>
           <p className="registration-secure"><LockKeyhole size={14}/> Your details are used only to manage this warranty.</p>

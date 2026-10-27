@@ -5,7 +5,7 @@ import { readApiResponse } from "@/lib/api-response";
 export function AddProductUnit({ sessionId, productId, onSaved }: { sessionId: string; productId: string; onSaved: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  return <section className="business-panel"><div className="business-panel-header"><div><h2>Add a delivered unit</h2><p>Use the serial number and delivery details from the actual purchase.</p></div></div><form className="business-form-section" onSubmit={async event => {
+  return <section className="business-panel"><div className="business-panel-header"><div><h2>Add or complete a unit</h2><p>Enter the Unit ID, Order ID and actual delivery date. This also completes an imported unit that has no order or delivery date.</p></div></div><form className="business-form-section" onSubmit={async event => {
     event.preventDefault(); if(saving) return;
     const form = event.currentTarget;
     const values = Object.fromEntries(new FormData(form));

@@ -1,0 +1,8 @@
+.panel > .toggle { cursor: pointer; list-style: none; flex-wrap: nowrap; }
+.toggle::-webkit-details-marker { display: none; }
+.panel:not([open]) > .toggle { border-bottom: 0; }
+.toggle:hover { background: #f7f9fb; }
+.toggle:focus-visible { outline: 2px solid #315c80; outline-offset: -4px; border-radius: 8px; }
+.toggle svg { flex-shrink: 0; color: #1d2935; transition: transform 180ms ease; }
+.panel[open] > .toggle svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .toggle svg { transition: none; } }

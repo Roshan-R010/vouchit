@@ -13,6 +13,7 @@ type CustomerClaim = {
   issueTitle: string;
   status: string;
   submittedAt: string;
+  addressNeeded?: boolean;
 };
 type Warranty = {
   demoSessionId?: string;
@@ -31,8 +32,8 @@ function ClaimList({ title, description, warranties, sessionId }: { title: strin
       const claim = warranty.claim!;
       return <article className="support-claim-card" key={claim.id}>
         <div className="support-claim-image">{warranty.imageUrl ? <ProductPhoto src={warranty.imageUrl} alt={warranty.productName}/> : <LifeBuoy size={28}/>}</div>
-        <div className="support-claim-copy"><div className="support-claim-topline"><span>{warranty.productName}</span><span>{formatDate(new Date(claim.submittedAt))}</span></div><h3>{claim.issueTitle}</h3><p>Claim {claim.reference} · Serial {warranty.serialNumber}</p></div>
-        <div className="support-claim-end"><ClaimStatusBadge status={claim.status}/><Link className="action secondary" to={`/demo/${warranty.demoSessionId || sessionId}/customer/claims/${claim.id}`}>View claim <ArrowRight size={15}/></Link></div>
+        <div className="support-claim-copy"><div className="support-claim-topline"><span>{warranty.productName}</span><span>{formatDate(new Date(claim.submittedAt))}</span></div><h3>{claim.issueTitle}</h3><p>Claim {claim.reference} · Serial {warranty.serialNumber}</p>{claim.addressNeeded && <strong style={{ color: "#9a521d", fontSize: 13 }}>Your address is needed</strong>}</div>
+        <div className="support-claim-end"><ClaimStatusBadge status={claim.status}/><Link className="action secondary" to={`/demo/${warranty.demoSessionId || sessionId}/customer/claims/${claim.id}`}>{claim.addressNeeded ? "Add address" : "View claim"} <ArrowRight size={15}/></Link></div>
       </article>;
     })}</div>
   </section>;

@@ -13,6 +13,7 @@ import BrandClaimDetail from "./pages/brand/BrandClaimDetail";
 import BrandProducts from "./pages/brand/BrandProducts";
 import BrandProductDetail from "./pages/brand/BrandProductDetail";
 import BrandNewProduct from "./pages/brand/BrandNewProduct";
+import BrandUnitImport from "./pages/brand/BrandUnitImport";
 import BrandCustomers from "./pages/brand/BrandCustomers";
 import BrandRegistrations from "./pages/brand/BrandRegistrations";
 import BrandAnalytics from "./pages/brand/BrandAnalytics";
@@ -54,6 +55,7 @@ export function App() {
         <Route path="claims/:claimId" element={<BrandClaimDetail />} />
         <Route path="products" element={<BrandProducts />} />
         <Route path="products/new" element={<BrandNewProduct />} />
+        <Route path="products/import" element={<BrandUnitImport />} />
         <Route path="products/:productId" element={<BrandProductDetail />} />
         <Route path="customers" element={<BrandCustomers />} />
         <Route path="registrations" element={<BrandRegistrations />} />

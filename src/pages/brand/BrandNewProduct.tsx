@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { IssueTagEditor } from "@/components/issue-tag-editor";
+import { ClaimPhotoLimitField } from "@/components/product-claim-photos";
 
 export function BrandNewProduct() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -17,6 +18,8 @@ export function BrandNewProduct() {
   const [deliveredOn, setDeliveredOn] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [issueTags, setIssueTags] = useState<string[]>([]);
+  const [claimPhotoLimit, setClaimPhotoLimit] = useState(3);
+  const [verificationMode, setVerificationMode] = useState("UNIT_ONLY");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +39,8 @@ export function BrandNewProduct() {
           sku,
           warrantyMonths,
           issueTags,
+          claimPhotoLimit,
+          verificationMode,
           serialNumber: serialNumber || undefined,
           orderNumber: orderNumber || undefined,
           deliveredOn: deliveredOn || undefined,
@@ -114,7 +119,10 @@ export function BrandNewProduct() {
             </div>
           </div>
 
+          <div className="business-field"><label>Registration verification</label><select value={verificationMode} onChange={event => setVerificationMode(event.target.value)}><option value="UNIT_ONLY">Unit ID</option><option value="ORDER_ONLY">Order ID</option><option value="ORDER_AND_UNIT">Order ID and Unit ID</option></select><small>Choose what customers must enter when registering this product.</small></div>
+
           <IssueTagEditor value={issueTags} onChange={setIssueTags} disabled={submitting}/>
+          <ClaimPhotoLimitField value={claimPhotoLimit} onChange={setClaimPhotoLimit} disabled={submitting}/>
 
           <details className="business-details" open>
             <summary>Add a delivered unit and order (optional)</summary>
