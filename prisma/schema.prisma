@@ -251,3 +251,21 @@ model DemoNotification {
   createdAt      DateTime         @default(now())
   demoSession    DemoSession      @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
 }
+
+model EmailOutbox {
+  id              String   @id @default(uuid()) @db.Uuid
+  eventKey        String   @unique
+  recipient       String
+  sender          String
+  subject         String
+  body            String
+  status          String   @default("PENDING")
+  attempts        Int      @default(0)
+  availableAt     DateTime @default(now())
+  firstAttemptAt  DateTime?
+  acceptedAt      DateTime?
+  providerId      String?
+  lastError       String?
+  createdAt       DateTime @default(now())
+  @@index([status, availableAt])
+}

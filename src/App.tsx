@@ -27,6 +27,7 @@ import CustomerNewClaim from "./pages/customer/CustomerNewClaim";
 import CustomerClaimDetail from "./pages/customer/CustomerClaimDetail";
 import CustomerRegister from "./pages/customer/CustomerRegisterPortal";
 import CustomerSupport from "./pages/customer/CustomerSupport";
+import CustomerSettings from "./pages/customer/CustomerSettings";
 
 function RequireRole({ role, children }: { role: "BRAND" | "CUSTOMER"; children: React.ReactNode }) {
   const { account, loading } = useAuth();
@@ -67,9 +68,11 @@ export function App() {
       <Route path="/customer" element={<RequireRole role="CUSTOMER"><CustomerLayout /></RequireRole>}>
         <Route index element={<CustomerDashboard />} />
         <Route path="claims" element={<CustomerSupport />} />
+        <Route path="settings" element={<CustomerSettings />} />
       </Route>
       <Route path="/demo/:sessionId/customer" element={<RequireRole role="CUSTOMER"><CustomerLayout /></RequireRole>}>
         <Route index element={<CustomerDashboard />} />
+        <Route path="settings" element={<CustomerSettings />} />
         <Route path="products/:unitId" element={<CustomerProductDetail />} />
         <Route path="claims" element={<CustomerSupport />} />
         <Route path="claims/new" element={<CustomerNewClaim />} />

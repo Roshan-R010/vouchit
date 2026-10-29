@@ -1,0 +1,27 @@
+:global(.business-shell) .unitsPanel:global(.business-panel){border:1px solid #c7d2dc;background:#fff;box-shadow:0 5px 22px #203b5514}
+.unitsPanel :global(.business-table) th{padding-top:11px;padding-bottom:11px}
+.unitsPanel :global(.business-table) td{padding-top:10px;padding-bottom:10px}
+.unitsPanel :global(.business-badge){padding:4px 8px}
+.expandButton{width:38px;height:38px;flex:none;display:grid;place-items:center;border:1px solid #dbe2e8;border-radius:8px;background:#fff;color:#263c50;cursor:pointer;transition:background .2s,border-color .2s}
+.expandButton:hover{background:#f0f5fa;border-color:#aec4d8}
+.expandButton:focus-visible,.pageNumbers button:focus-visible{outline:2px solid #7ca7d1;outline-offset:2px}
+.expandButton svg{transition:transform .28s ease}
+.chevronOpen{transform:rotate(180deg)}
+.collapsible{overflow:hidden}
+.searchRow{position:relative;padding:15px 20px;border-bottom:1px solid #e7edf1}
+.loading{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden;background:#e3ecf8;pointer-events:none}
+.loading span{display:block;width:35%;height:100%;background:#315de4;animation:unit-loading 1s ease-in-out infinite alternate}
+@keyframes unit-loading{from{transform:translateX(-100%)}to{transform:translateX(285%)}}
+.pagination{display:flex;justify-content:flex-end;padding:12px 20px;background:#f4f6f8;border-top:1px solid #d9e1e9}
+.pageCard{display:grid;gap:6px;max-width:100%;padding:10px 14px;border:1px solid #d6e0e9;border-radius:14px;background:#fff;box-shadow:0 2px 8px #16314d0d}
+.pageCard>strong{color:#253443;font-size:14px;font-weight:700}
+.pageNumbers{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pageNumbers button{position:relative;display:grid;place-items:center;height:32px;min-width:32px;padding:0 7px;border:0;border-radius:999px;background:transparent;color:#536171;font-size:13px;font-weight:600;cursor:pointer;transition:color .2s ease,background .2s ease}
+.pageNumbers button:hover:not(:disabled):not([aria-current="page"]){background:#eef3fa;color:#245e99}
+.pageNumbers button:disabled{cursor:wait}
+.pageNumbers .pageNumber[aria-current="page"]{color:#fff}
+.pageNumber>span:last-child{position:relative;z-index:1}
+.activePage{position:absolute;inset:0;border-radius:50%;background:#315de4;box-shadow:0 3px 9px #315de42a}
+.pageNumbers .pageTextButton{padding:0 10px;min-width:auto;color:#315de4}
+@media(max-width:600px){.pagination{justify-content:center;padding:14px}.pageCard{width:100%}.pageNumbers{gap:2px}.pageNumbers button{min-width:30px;height:30px;padding:0 5px}}
+@media(prefers-reduced-motion:reduce){.expandButton,.expandButton svg,.pageNumbers button{transition:none}.loading span{animation:none;width:100%}}

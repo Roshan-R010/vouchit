@@ -2,8 +2,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronDown, ChevronRight, Grid2X2, ImagePlus, List, Package, Search } from "lucide-react";
-import { ProductImageEditor } from "@/components/product-image-editor";
+import { Check, ChevronDown, ChevronRight, Copy, Grid2X2, List, Package, Search } from "lucide-react";
 import styles from "./brand-products.module.css";
 
 export function BrandProducts() {
@@ -14,7 +13,24 @@ export function BrandProducts() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [editing, setEditing] = useState<any>(null);
+  const [copyNotice, setCopyNotice] = useState<{ message: string; success: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!copyNotice) return;
+    const timer = setTimeout(() => setCopyNotice(null), 2400);
+    return () => clearTimeout(timer);
+  }, [copyNotice]);
+
+  async function copyRegistrationLink(product: any) {
+    if (!sessionId || !brand?.slug) return;
+    const path = `/demo/${sessionId}/register/${encodeURIComponent(brand.slug)}/${encodeURIComponent(product.slug)}`;
+    try {
+      await navigator.clipboard.writeText(new URL(path, window.location.origin).href);
+      setCopyNotice({ message: "Link copied", success: true });
+    } catch {
+      setCopyNotice({ message: "Could not copy link. Please allow clipboard access and try again.", success: false });
+    }
+  }
 
   const visible = useMemo(() => products.filter((product) => `${product.name} ${product.sku || ""}`.toLowerCase().includes(search.trim().toLowerCase()) && (filter === "all" || (filter === "registered" ? product.registeredCount > 0 : product.unitCount === 0))), [products, search, filter]);
 
@@ -44,11 +60,11 @@ export function BrandProducts() {
     {loading ? <div className={styles.empty}>Loading products…</div> : visible.length === 0 ? <div className={styles.empty}>{products.length ? "No products match this search or filter." : "No products yet. Add your first product to get started."}</div> :
       <div className={view === "grid" ? styles.grid : styles.list}>
         {visible.map((product) => <article className={styles.card} key={product.id}>
-          <div className={styles.photo}>{product.imageUrl ? <ProductPhoto src={product.imageUrl} alt={product.name}/> : <Package size={44} strokeWidth={1.4}/>}<button type="button" className={styles.editPhoto} onClick={() => setEditing(product)} aria-label={`Change image for ${product.name}`} title="Change image"><ImagePlus size={17}/></button></div>
+          <div className={styles.photo}>{product.imageUrl ? <ProductPhoto src={product.imageUrl} alt={product.name}/> : <Package size={44} strokeWidth={1.4}/>}<button type="button" className={styles.copyLink} onClick={() => void copyRegistrationLink(product)} disabled={!brand?.slug} aria-label={`Copy registration link for ${product.name}`} title="Copy registration link"><Copy size={14}/></button></div>
           <div className={styles.details}><Link className={styles.name} to={`/demo/${sessionId}/brand/products/${product.id}`}>{product.name}</Link><span className={styles.sku}>SKU: {product.sku || "Not set"}</span><span className={styles.warranty}>{product.warrantyMonths}m warranty</span><div className={styles.footer}><span>{(product.unitCount || 0).toLocaleString()} {product.unitCount === 1 ? "unit" : "units"} · {product.registeredCount || 0} registered</span><Link to={`/demo/${sessionId}/brand/products/${product.id}`} aria-label={`Manage ${product.name}`}><ChevronRight size={21}/></Link></div></div>
         </article>)}
       </div>}
-    {editing && sessionId && <ProductImageEditor sessionId={sessionId} productId={editing.id} productName={editing.name} imageUrl={editing.imageUrl} onClose={() => setEditing(null)} onSaved={(url) => { setProducts((current) => current.map((product) => product.id === editing.id ? { ...product, imageUrl: url } : product)); setEditing(null); }}/ >}
+    <div className={styles.copyNotice} role="status" aria-live="polite" aria-atomic="true">{copyNotice && <span className={styles.toast}>{copyNotice.success && <Check size={15} aria-hidden="true"/>}{copyNotice.message}</span>}</div>
   </div>;
 }
 export default BrandProducts;

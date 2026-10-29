@@ -6,8 +6,12 @@ import { ProductPhoto } from "@/components/product-photo";
 import { ProductImageEditor } from "@/components/product-image-editor";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Package, ExternalLink, ImagePlus } from "lucide-react";
+import { ArrowLeft, Package, ExternalLink, ImagePlus, ChevronDown } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatDate } from "@/lib/dates";
+import styles from "./brand-product-detail.module.css";
+
+const UNIT_PAGE_SIZE = 10;
 
 export function BrandProductDetail() {
   const { sessionId, productId } = useParams<{ sessionId: string; productId: string }>();
@@ -20,7 +24,13 @@ export function BrandProductDetail() {
   const [unitTotal, setUnitTotal] = useState(0);
   const [registeredCount, setRegisteredCount] = useState(0);
   const [unitPage, setUnitPage] = useState(1);
+  const [displayPage, setDisplayPage] = useState(1);
   const [unitSearch, setUnitSearch] = useState("");
+  const [displaySearch, setDisplaySearch] = useState("");
+  const [unitsExpanded, setUnitsExpanded] = useState(false);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [unitError, setUnitError] = useState("");
+  const reducedMotion = useReducedMotion();
   const [modeSaving, setModeSaving] = useState(false);
   const [modeError, setModeError] = useState("");
   const [verificationMode, setVerificationMode] = useState("UNIT_ONLY");
@@ -44,11 +54,21 @@ export function BrandProductDetail() {
 
   useEffect(() => {
     if (!sessionId || !productId) return;
+    let active = true;
+    setUnitsLoading(true);
+    setUnitError("");
     const timer = window.setTimeout(() => {
-      apiFetch(`/api/demo/${sessionId}/brand/products/${productId}/units?page=${unitPage}&size=25&search=${encodeURIComponent(unitSearch)}`)
-        .then(res => res.json()).then(data => { setUnits(data.units ?? []); setUnitTotal(data.total ?? 0); setRegisteredCount(data.registered ?? 0); }).catch(() => {});
+      apiFetch(`/api/demo/${sessionId}/brand/products/${productId}/units?page=${unitPage}&size=${UNIT_PAGE_SIZE}&search=${encodeURIComponent(unitSearch)}`)
+        .then(res => { if (!res.ok) throw new Error("Could not load units."); return res.json(); }).then(data => {
+          if (!active) return;
+          setUnits(data.units ?? []);
+          setUnitTotal(data.total ?? 0);
+          setRegisteredCount(data.registered ?? 0);
+          setDisplayPage(unitPage);
+          setDisplaySearch(unitSearch);
+        }).catch(() => { if (active) setUnitError("Could not load units. Try another page or reload."); }).finally(() => { if (active) setUnitsLoading(false); });
     }, 200);
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, [sessionId, productId, version, unitPage, unitSearch]);
 
   if (loading) {
@@ -82,6 +102,9 @@ export function BrandProductDetail() {
   }
 
   const regUrl = `${window.location.origin}/demo/${sessionId}/register/${brand?.slug || ""}/${product.slug}`;
+  const totalPages = Math.max(1, Math.ceil(unitTotal / UNIT_PAGE_SIZE));
+  const firstVisiblePage = Math.max(1, Math.min(unitPage - 3, totalPages - 7));
+  const visiblePages = Array.from({ length: Math.min(8, totalPages) }, (_, index) => firstVisiblePage + index);
 
   return (
     <div>
@@ -125,23 +148,27 @@ export function BrandProductDetail() {
       </div></section>
       {sessionId && productId && <AddProductUnit sessionId={sessionId} productId={productId} onSaved={() => setVersion(value => value + 1)}/>}
       {/* Units Table */}
-      <div className="business-panel">
+      <div className={`business-panel ${styles.unitsPanel}`}>
         <div className="business-panel-header">
           <div>
             <h2>Stamped Units & Delivery Records</h2>
             <p>{product.unitCount || 0} units · {registeredCount} registered. Imported units are listed here.</p>
           </div>
+          <button type="button" className={styles.expandButton} aria-label={unitsExpanded ? "Collapse stamped units" : "Expand stamped units"} aria-expanded={unitsExpanded} aria-controls="stamped-units-content" onClick={() => setUnitsExpanded(value => !value)}><ChevronDown size={20} className={unitsExpanded ? styles.chevronOpen : ""}/></button>
         </div>
 
-        <div style={{ padding: "15px 20px", borderBottom: "1px solid #e7edf1" }}><label className="business-field" style={{ margin: 0, maxWidth: 360 }}><span>Search Unit ID</span><input type="search" value={unitSearch} onChange={event => { setUnitSearch(event.target.value); setUnitPage(1); }} placeholder="Search serial number"/></label></div>
+        <AnimatePresence initial={false}>
+        {unitsExpanded && <motion.div id="stamped-units-content" className={styles.collapsible} initial={reducedMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: "easeInOut" }}>
+        <div className={styles.searchRow}><label className="business-field" style={{ margin: 0, maxWidth: 360 }}><span>Search Unit ID</span><input type="search" value={unitSearch} onChange={event => { setUnitSearch(event.target.value); setUnitPage(1); }} placeholder="Search serial number"/></label>{unitsLoading && <span className={styles.loading} role="status" aria-label="Updating units"><span/></span>}</div>
 
-        {unitTotal === 0 ? (
+        {unitError && <p className="business-notice error" role="alert">{unitError}</p>}
+        {!unitsLoading && !unitError && unitTotal === 0 ? (
           <div className="business-empty">
-            <h2>No units stamped yet</h2>
-            <p>Add serial numbers and purchase orders to track individual warranties.</p>
+            <h2>{unitSearch ? "No matching units" : "No units stamped yet"}</h2>
+            <p>{unitSearch ? "Try another unit ID." : "Add serial numbers and purchase orders to track individual warranties."}</p>
           </div>
-        ) : (
-          <div className="business-table-wrap">
+        ) : !unitError && units.length > 0 && (
+          <AnimatePresence mode="wait" initial={false}><motion.div key={`${displayPage}:${displaySearch}`} initial={reducedMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? undefined : { opacity: 0, x: -18 }} transition={{ duration: 0.24, ease: "easeOut" }} className="business-table-wrap">
             <table className="business-table">
               <thead>
                 <tr>
@@ -149,7 +176,6 @@ export function BrandProductDetail() {
                   <th>PURCHASE ORDER</th>
                   <th>DELIVERY DATE</th>
                   <th>REGISTRATION STATUS</th>
-                  <th>CUSTOMER</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,14 +195,15 @@ export function BrandProductDetail() {
                         <span className="business-badge">Unregistered</span>
                       )}
                     </td>
-                    <td>{u.registration?.customer?.name || "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </motion.div></AnimatePresence>
         )}
-        {unitTotal > 25 && <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, padding: 16 }}><span>Page {unitPage} of {Math.ceil(unitTotal / 25)}</span><button className="business-button small" disabled={unitPage === 1} onClick={() => setUnitPage(value => value - 1)}>Previous</button><button className="business-button small" disabled={unitPage * 25 >= unitTotal} onClick={() => setUnitPage(value => value + 1)}>Next</button></div>}
+        {totalPages > 1 && <nav className={styles.pagination} aria-label="Stamped units pages"><div className={styles.pageCard}><strong>Page</strong><div className={styles.pageNumbers}>{unitPage > 1 && <button type="button" className={styles.pageTextButton} disabled={unitsLoading} onClick={() => setUnitPage(page => page - 1)}>Previous</button>}{visiblePages.map(page => <button type="button" key={page} className={styles.pageNumber} aria-label={`Page ${page}`} aria-current={unitPage === page ? "page" : undefined} disabled={unitsLoading} onClick={() => setUnitPage(page)}>{unitPage === page && <motion.span layoutId={`active-unit-page-${productId}`} className={styles.activePage} transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}/>}<span>{page}</span></button>)}{unitPage < totalPages && <button type="button" className={styles.pageTextButton} disabled={unitsLoading} onClick={() => setUnitPage(page => page + 1)}>Next</button>}</div></div></nav>}
+        </motion.div>}
+        </AnimatePresence>
       </div>
     </div>
   );

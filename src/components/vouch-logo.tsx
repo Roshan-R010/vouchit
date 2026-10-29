@@ -1,3 +1,3 @@
-export function VouchLogo() {
-  return <span className="vouch-wordmark" aria-label="vouch">vouch<span className="vouch-wordmark-dot">.</span></span>;
+export function VouchLogo({ compact = false }: { compact?: boolean }) {
+  return <span className="vouch-wordmark" aria-label="vouch">{compact ? "v" : "vouch"}<span className="vouch-wordmark-dot">.</span></span>;
 }

@@ -15,11 +15,14 @@ export function CustomerNav({ sessionId, customerName = "Customer", brandName, b
   const items = [
     { label: "Warranties", href: "/customer" },
     { label: "Support", href: "/customer/claims" },
+    ...(account?.role === "CUSTOMER" ? [{ label: "Settings", href: "/customer/settings" }] : []),
   ];
   return <header className="topbar page-wrap">
     <Link href={account?.role === "CUSTOMER" ? "/customer" : "/"} className="brandmark" aria-label="Vouch home"><VouchLogo /></Link>
     <nav className="nav-links" aria-label="Customer navigation">{items.map((item) => {
-      const active = item.label === "Warranties" ? (pathname.includes("/customer") && !pathname.includes("/customer/claims")) || pathname.includes("/register") : pathname.includes("/customer/claims");
+      const active = item.label === "Settings" ? pathname.includes("/customer/settings")
+        : item.label === "Support" ? pathname.includes("/customer/claims")
+        : (pathname.includes("/customer") && !pathname.includes("/customer/claims") && !pathname.includes("/customer/settings")) || pathname.includes("/register");
       return <Link key={item.label} href={item.href} className={`nav-link ${active ? "active" : ""}`}>
         {item.label}{active && <motion.span className="nav-underline" layoutId="customer-nav-underline" transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }} />}
       </Link>;

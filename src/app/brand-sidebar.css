@@ -28,3 +28,49 @@
 .brand-shell[data-nav-expanded=false] .brand-rail-expand{left:19px}
 .brand-shell[data-nav-expanded=false] .brand-rail-account-menu{left:62px}
 @media(max-width:760px){.brand-shell,.brand-shell[data-nav-expanded=true],.brand-shell[data-nav-expanded=false]{--brand-nav-width:66px}.brand-shell .business-main{margin-left:66px!important}.brand-shell[data-nav-expanded=false] .brand-rail-sidebar{width:66px}.brand-shell[data-nav-expanded=true] .brand-rail-sidebar{width:min(260px,calc(100vw - 22px))}}
+
+/* Give only the current section's icon a quiet accent. */
+.brand-rail-link[data-section=dashboard]{--nav-icon-accent:#7055bd;--nav-icon-accent-dark:#b3a0f2}
+.brand-rail-link[data-section=claims]{--nav-icon-accent:#ad5476;--nav-icon-accent-dark:#e5a0b7}
+.brand-rail-link[data-section=products]{--nav-icon-accent:#3974ab;--nav-icon-accent-dark:#91bee9}
+.brand-rail-link[data-section=customers]{--nav-icon-accent:#377d70;--nav-icon-accent-dark:#83c8b9}
+.brand-rail-link[data-section=registrations]{--nav-icon-accent:#9c6b43;--nav-icon-accent-dark:#e0b58a}
+.brand-rail-link[data-section=analytics]{--nav-icon-accent:#5a7b49;--nav-icon-accent-dark:#abd08f}
+.brand-rail-link[data-section=settings]{--nav-icon-accent:#6c6388;--nav-icon-accent-dark:#b6afce}
+.brand-rail-icon{transition:color .2s ease,background-color .2s ease}
+.brand-shell[data-nav-expanded=true] .brand-rail-link .brand-rail-icon{color:#2e3943}
+.brand-shell[data-nav-expanded=true] .brand-rail-link:not(.active):hover .brand-rail-icon{color:#2e3943}
+.brand-shell[data-nav-expanded=true] .brand-rail-link.active{background:#f2f3f6;color:#25313c}
+.brand-shell[data-nav-expanded=true] .brand-rail-link.active .brand-rail-icon,.brand-shell[data-nav-expanded=true] .brand-rail-link.active:hover .brand-rail-icon{color:var(--nav-icon-accent,#7055bd)}
+.brand-shell[data-nav-expanded=false] .brand-rail-link.active .brand-rail-icon{color:var(--nav-icon-accent-dark,#b3a0f2)}
+.brand-shell[data-nav-expanded=false] .brand-rail-link.active .brand-rail-icon-active{background:#353e49}
+
+/* Shared dark navigation across the brand workspace. */
+.brand-shell .brand-rail-sidebar,.brand-shell[data-nav-expanded=true] .brand-rail-sidebar,.brand-shell[data-nav-expanded=false] .brand-rail-sidebar{background:linear-gradient(155deg,#181f23,#11181b);border-right:1px solid #293136;color:#d8dfe5}
+.brand-shell .brand-rail-header{height:70px;flex-basis:70px}
+.brand-shell .brand-rail-wordmark .vouch-wordmark{color:#fff;font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:34px;letter-spacing:-1.8px;line-height:1}
+.brand-shell .brand-rail-wordmark .vouch-wordmark-dot,.brand-shell .brand-rail-mark span{color:#ef514b}
+.brand-shell .brand-rail-toggle{color:#9daab4}
+.brand-shell .brand-rail-toggle:hover{background:#303a41;color:#fff}
+.brand-shell .brand-rail-workspace{border-top:1px solid #2a3238;border-bottom:1px solid #2a3238;margin:0 12px}
+.brand-shell[data-nav-expanded=true] .brand-rail-workspace-panel{padding:6px 6px}
+.brand-shell .brand-rail-brand-avatar{background:#f5f7f9;color:#26313b;border-radius:50%;width:31px;height:31px;flex-basis:31px}
+.brand-shell .brand-rail-brand-text strong{color:#eef1f4}
+.brand-shell .brand-rail-brand-text small{color:#a1adb9;font-size:11px}
+.brand-shell .brand-rail-nav{padding-top:18px}
+.brand-shell[data-nav-expanded=true] .brand-rail-link{margin:1px 9px;min-height:43px;position:relative;color:#c5cfd6;border-radius:5px}
+.brand-shell[data-nav-expanded=true] .brand-rail-link .brand-rail-icon,.brand-shell[data-nav-expanded=true] .brand-rail-link:not(.active):hover .brand-rail-icon{color:#bfcad3}
+.brand-shell[data-nav-expanded=true] .brand-rail-link.active{background:#ffffff0d;color:#fff}
+.brand-shell[data-nav-expanded=true] .brand-rail-link.active:before{content:"";position:absolute;left:-9px;top:0;bottom:0;width:3px;background:#ff7628}
+.brand-shell[data-nav-expanded=true] .brand-rail-link.active .brand-rail-icon,.brand-shell[data-nav-expanded=true] .brand-rail-link.active:hover .brand-rail-icon,.brand-shell[data-nav-expanded=false] .brand-rail-link.active .brand-rail-icon{color:#ffab75}
+.brand-shell[data-nav-expanded=true] .brand-rail-link:hover{background:#ffffff09;color:#fff}
+.brand-shell .brand-rail-account{color:#e8edf1}
+.brand-shell .brand-rail-account:hover{background:#ffffff0b}
+.brand-shell .brand-rail-account-avatar{background:#dfe5ed;color:#26313b}
+.brand-shell .brand-rail-account-text small{color:#a0aebb}
+.brand-shell .brand-rail-bottom:before{border-color:#2b333b}
+.brand-shell .brand-rail-mark{height:70px}
+.brand-shell .brand-rail-mark .vouch-wordmark{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:30px;letter-spacing:-1px;line-height:1;color:#fff}
+.brand-shell .brand-rail-mark .vouch-wordmark-dot{color:#ef514b}
+.brand-shell[data-nav-expanded=false] .brand-rail-header-panel{visibility:hidden}
+@media(max-width:760px){.brand-shell .brand-rail-workspace{margin:0}}

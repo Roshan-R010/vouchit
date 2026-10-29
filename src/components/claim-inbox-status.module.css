@@ -1,0 +1,5 @@
+.badge{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:5px 8px;border-radius:6px;font-size:12px;font-weight:550;line-height:1.35;white-space:nowrap;color:#4c5b77;background:#eef1f6}
+.badge[data-status=SUBMITTED]{color:#c54808;background:#fff0de}
+.badge[data-status=UNDER_REVIEW]{color:#1161ce;background:#e9f2ff}
+.badge[data-status=APPROVED],.badge[data-status=RESOLVED]{color:#087f52;background:#e5f7ed}
+.badge[data-status=REJECTED]{color:#d22c45;background:#ffedf0}

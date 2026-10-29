@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 import "@/app/brand.css";
 import "@/app/brand-sidebar.css";
+import "@/app/claims-workspace.css";
 
 export function BrandLayout() {
   const { sessionId } = useParams();
@@ -30,7 +31,7 @@ export function BrandLayout() {
     return () => { active = false; window.removeEventListener("vouch:data-changed", update); };
   }, [sessionId]);
   if (!sessionId) return <p>Workspace not found.</p>;
-  return <div className="business-shell brand-shell" data-nav-expanded={navExpanded} data-claim-detail={isClaimDetail}>
+  return <div className="business-shell brand-shell" data-nav-expanded={navExpanded} data-claim-detail={isClaimDetail} data-claims-workspace={section === "claims"} data-claims-inbox={section === "claims" && !isClaimDetail}>
     <BrandNav sessionId={sessionId} brandName={brand?.name || "Your brand"} logoUrl={brand?.logoUrl} expanded={navExpanded} onToggle={toggleNav}/>
     {navExpanded && <button type="button" className="brand-nav-scrim" aria-label="Close navigation" onClick={toggleNav}/>}
     <div className="business-main"><header className="business-topbar"><span><strong>{brand?.name || "Your brand"}</strong><span className="business-muted"> / {sectionLabel}</span></span></header><main className="business-content"><RouteTransition><Outlet/></RouteTransition></main></div>

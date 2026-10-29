@@ -1,0 +1,4 @@
+.brand-shell[data-claims-workspace=true]{background:#f7f8fa;--business-muted:#778199}
+.brand-shell[data-claims-inbox=true] .business-topbar{display:none}
+.brand-shell[data-claims-inbox=true] .business-content{max-width:none;padding:29px 28px 24px}
+@media(max-width:760px){.brand-shell[data-claims-inbox=true] .business-content{padding:23px 16px}}

@@ -40,6 +40,31 @@ For claim photos, add the server-only `SUPABASE_SECRET_KEY` in `.env`. The serve
 
 Do not run `db:clear` unless all local records should be deleted.
 
+## Registration emails
+
+Set `RESEND_API_KEY` and `EMAIL_FROM` in the server environment (see `.env.example`).
+Apply migrations with `npx prisma migrate deploy`, regenerate the client with
+`npm run db:generate`, and restart the API. Customers can update their email under
+**Settings**. The email stays on their account and synchronizes to their customer
+records; username/password login is unchanged.
+
+Each new registration saves one `EmailOutbox` job in the registration transaction.
+The Express server processes jobs every 15 seconds while running. Confirmations
+contain the product, brand, and remaining coverage days at registration. Existing
+registrations and repeat submissions do not enqueue messages. The sender and
+message are saved with the job so retries use the same Resend idempotency key and
+payload. `ACCEPTED` means Resend accepted the email, not confirmed inbox delivery.
+Transient failures retry up to eight attempts within 23 hours of the first attempt;
+permanent failures and expired retries are marked `FAILED` for review. Inspect
+`lastError` and the Resend dashboard before manually retrying an uncertain send.
+Without an API key, jobs remain pending. Serverless hosting will need a scheduled
+worker instead of relying on the Express process timer.
+
+For testing with `onboarding@resend.dev`, use the same recipient email as your
+Resend account. Resend rejects other recipients until you verify a sending domain.
+For production, configure `EMAIL_FROM` with that domain. Email address verification
+and Google sign-in are not part of this initial settings flow.
+
 ## Importing units
 
 Open **Brand → Products → Import units**. A file can contain one product's Unit IDs or several products identified by SKU. You can map any source headers, preview valid and skipped rows, then confirm. Reuploading a file adds only new Unit IDs for that brand. Imports do not create warranties.

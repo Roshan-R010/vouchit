@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar, ChevronDown } from "lucide-react";
 import { formatDate } from "@/lib/dates";
+import { shortClaimReference } from "@/lib/claim-reference";
 import historyStyles from "./claim-history.module.css";
 import styles from "./claim-detail.module.css";
 
@@ -151,7 +152,7 @@ export function BrandClaimDetail() {
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <Link to={`/demo/${sessionId}/brand/claims`} className={styles.back}><ArrowLeft size={16} /> Back to claims</Link>
-          <div className={styles.reference}><span>Claim {claim.reference}</span><ClaimStatusBadge status={status}/></div>
+          <div className={styles.reference}><span title={claim.reference} aria-label={`Claim ${claim.reference}`}>Claim {shortClaimReference(claim.reference)}</span><ClaimStatusBadge status={status}/></div>
         </div>
         <div className={styles.titleRow}><h1>{claim.issueTitle}</h1><p>Submitted by {customer.name} on {formatDate(claim.submittedAt)}</p></div>
       </header>

@@ -85,9 +85,9 @@ export function CustomerProductDetail() {
           </p>
         </div>
 
-        <div style={{ marginTop: "24px", display: "flex", gap: "12px" }}>
+        <div className={`customer-product-action-row${claim ? " is-centered" : ""}`}>
           {claim ? (
-            <Link to={`/demo/${sessionId}/customer/claims/${claim.id}`} className="action">
+            <Link to={`/demo/${sessionId}/customer/claims/${claim.id}`} className="action customer-view-claim">
               View claim
             </Link>
           ) : active ? (

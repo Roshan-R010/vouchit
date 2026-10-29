@@ -16,6 +16,7 @@ import { addCalendarMonths, dateOnly, daysRemaining, formatDate, isCoverageActiv
 import { readProductImage, removeNewProductImage, saveBrandLogo, saveProductImage } from "../src/lib/product-images";
 import { ClaimImageStorageError, MAX_CLAIM_PHOTOS, readClaimImage, removeClaimImages, saveClaimImage } from "./claim-images";
 import { commitImport, parseSource, previewImport } from "./unit-import";
+import { registrationEmail, startEmailWorker } from "./email";
 
 // Automatically load environment variables if .env exists
 try {
@@ -79,6 +80,29 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.post("/api/auth/logout", async (req, res) => { await endSession(req, res); res.json({ success: true }); });
+
+app.get("/api/account/customer/settings", async (req, res) => {
+  const account = await currentAccount(req);
+  if (!account || account.role !== AccountRole.CUSTOMER) return res.status(401).json({ error: "Please sign in as a customer." });
+  res.json({ email: account.email ?? "" });
+});
+
+app.put("/api/account/customer/settings", async (req, res) => {
+  const account = await currentAccount(req);
+  if (!account || account.role !== AccountRole.CUSTOMER) return res.status(401).json({ error: "Please sign in as a customer." });
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
+  try {
+    await db.$transaction(async tx => {
+      await tx.account.update({ where: { id: account.id }, data: { email } });
+      await tx.customer.updateMany({ where: { accountId: account.id }, data: { email } });
+    });
+    res.json({ email });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return res.status(409).json({ error: "This email address is already in use." });
+    res.status(500).json({ error: "Could not save your email. Please try again." });
+  }
+});
 
 app.get("/api/account/customer", async (req, res) => {
   const account = await currentAccount(req);
@@ -282,6 +306,8 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
       where.OR = [
         { reference: { contains: q, mode: "insensitive" } },
         { issueTitle: { contains: q, mode: "insensitive" } },
+        { registration: { unit: { purchaseOrder: { orderNumber: { contains: q, mode: "insensitive" } } } } },
+        { registration: { customer: { email: { contains: q, mode: "insensitive" } } } },
         { registration: { unit: { serialNumber: { contains: q, mode: "insensitive" } } } },
         { registration: { customer: { name: { contains: q, mode: "insensitive" } } } },
       ];
@@ -319,6 +345,7 @@ app.get("/api/demo/:sessionId/brand/claims", async (req, res) => {
     const counts = {
       all: allCounts.length,
       needs_review: allCounts.filter((c) => c.status === ClaimStatus.SUBMITTED).length,
+      approved: allCounts.filter((c) => c.status === ClaimStatus.APPROVED).length,
       in_review: allCounts.filter((c) => c.status === ClaimStatus.UNDER_REVIEW).length,
       open: allCounts.filter((c) => ([ClaimStatus.SUBMITTED, ClaimStatus.UNDER_REVIEW, ClaimStatus.INFO_REQUESTED] as ClaimStatus[]).includes(c.status)).length,
       resolved: allCounts.filter((c) => ([ClaimStatus.APPROVED, ClaimStatus.RESOLVED] as ClaimStatus[]).includes(c.status)).length,
@@ -607,7 +634,7 @@ app.get("/api/demo/:sessionId/brand/products/:productId/units", async (req, res)
     const [total, registered, units] = await Promise.all([
       db.productUnit.count({ where }),
       db.productUnit.count({ where: { brandId: brand.id, productModelId: product.id, registration: { isNot: null } } }),
-      db.productUnit.findMany({ where, include: { purchaseOrder: true, registration: { include: { customer: { select: { name: true } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * size, take: size }),
+      db.productUnit.findMany({ where, include: { purchaseOrder: true, registration: { select: { id: true } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * size, take: size }),
     ]);
     res.json({ units, total, registered, page, size });
   } catch { res.status(500).json({ error: "Could not load units." }); }
@@ -1335,7 +1362,7 @@ app.post("/api/demo/:sessionId/register", async (req, res) => {
   }
 
   try {
-    const product = await db.productModel.findFirst({ where: { slug: productSlug, brand: { slug: brandSlug, demoSessionId: sessionId } } });
+    const product = await db.productModel.findFirst({ where: { slug: productSlug, brand: { slug: brandSlug, demoSessionId: sessionId } }, include: { brand: true } });
     if (!product) return res.status(404).json({ error: "Product not found." });
     const dual = product.verificationMode === RegistrationVerificationMode.ORDER_AND_UNIT;
     const orderOnly = product.verificationMode === RegistrationVerificationMode.ORDER_ONLY;
@@ -1394,6 +1421,13 @@ app.post("/api/demo/:sessionId/register", async (req, res) => {
         },
       });
 
+      const email = registrationEmail(unit.productModel.name, product.brand.name, end);
+      await tx.emailOutbox.create({ data: {
+        eventKey: `warranty-registered/${created.id}`,
+        recipient: cleanEmail,
+        sender: process.env.EMAIL_FROM || "Vouch <onboarding@resend.dev>",
+        ...email,
+      } });
       return created;
     });
 
@@ -1454,4 +1488,5 @@ app.use(apiErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`[Vouch API Server] running on http://localhost:${PORT}`);
+  startEmailWorker();
 });

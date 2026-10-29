@@ -54,8 +54,8 @@ test("brand filters claims by product-specific and cross-product issue tags", as
   await page.goto(`/demo/${workspaceId}/brand/claims`);
   await expect(page.getByText(`Cooler issue ${key}`, { exact: true })).toBeVisible();
   await expect(page.getByText(`Speaker issue ${key}`, { exact: true })).toBeVisible();
-  await expect(page.locator('button[aria-pressed]')).toHaveCount(6);
-  await expect(page.getByRole("button", { name: /^More/ })).toBeVisible();
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await expect(page.locator('button[aria-pressed]')).toHaveCount(12);
 
   await page.getByLabel("Product").selectOption(firstProduct.id);
   await expect(page).toHaveURL(new RegExp(`product=${firstProduct.id}`));
@@ -69,12 +69,9 @@ test("brand filters claims by product-specific and cross-product issue tags", as
   await expect(page.locator('button[aria-pressed]')).toHaveCount(6);
 
   await page.getByRole("button", { name: "Reset filters", exact: true }).click();
-  const quickBefore = await page.locator('button[aria-pressed]').allTextContents();
-  await page.getByRole("button", { name: /^More/ }).click();
-  const moreMenu = page.getByRole("group", { name: "More issue tags" });
-  const extraTag = (await moreMenu.locator("label").first().innerText()).trim();
-  await moreMenu.getByText(extraTag, { exact: true }).click();
-  await expect(page.getByRole("button", { name: /^More/ })).toContainText("1");
-  expect(await page.locator('button[aria-pressed]').allTextContents()).toEqual(quickBefore);
+  await expect(page.locator('button[aria-pressed]')).toHaveCount(12);
+  await page.getByRole("button", { name: "Battery", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Battery", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: /^Filters/ })).toContainText("1");
   await expect(page.locator("tbody tr")).toHaveCount(1);
 });
