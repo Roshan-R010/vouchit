@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { ClaimStatusBadge } from "@/components/claim-status-badge";
 import { ClaimEvidence } from "@/components/claim-evidence";
 import { ProductPhoto } from "@/components/product-photo";
@@ -281,7 +282,7 @@ export function BrandClaimDetail() {
                     <div>
                       <div className="business-field">
                         <label>Action</label>
-                        <select
+                        <Select
                           value={decision}
                           onChange={(e) => setDecision(e.target.value)}
                           style={{
@@ -295,10 +296,10 @@ export function BrandClaimDetail() {
                           <option value="approve">Approve claim</option>
                           <option value="request_info">Request information</option>
                           <option value="reject">Reject claim</option>
-                        </select>
+                        </Select>
                       </div>
 
-                      {decision === "approve" && <div className="business-field"><label>Planned resolution</label><select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)} required><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></select><p className="business-hint">Approving will ask the customer for a delivery or collection address.</p></div>}
+                      {decision === "approve" && <div className="business-field"><label>Planned resolution</label><Select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)} required><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></Select><p className="business-hint">Approving will ask the customer for a delivery or collection address.</p></div>}
 
                       <div className="business-field">
                         <label>
@@ -380,7 +381,7 @@ export function BrandClaimDetail() {
               <dl className={styles.contact}><div><dt>Name</dt><dd>{customer.name}</dd></div><div><dt>Email</dt><dd>{customer.email}</dd></div></dl>
               {(status === "APPROVED" || status === "RESOLVED") && <section className={styles.address} aria-label="Customer address">
                 <h3>Delivery / collection address</h3>
-                {claim.addressRequest?.receivedAt ? <address><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address> : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p> : <><p>This claim has no address request.</p>{status === "APPROVED" && <>{!claim.resolutionMethod && <div className="business-field"><label>Planned resolution</label><select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></select></div>}<button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button></>}</>}
+                {claim.addressRequest?.receivedAt ? <address><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address> : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p> : <><p>This claim has no address request.</p>{status === "APPROVED" && <>{!claim.resolutionMethod && <div className="business-field"><label>Planned resolution</label><Select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></Select></div>}<button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button></>}</>}
               </section>}
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 import { formatDate } from "@/lib/dates";
@@ -116,7 +117,7 @@ function ClaimPanelContent({ sessionId, claimId, onClose, onUpdated, closeRef }:
 
             {action && <form className={styles.actionForm} onSubmit={submit}>
               <h3>{actionLabels[action]}</h3>
-              {["approve", "resolve", "request_address"].includes(action) && <label>Resolution method<select value={resolutionMethod} disabled={submitting || (action === "resolve" && Boolean(claim.resolutionMethod))} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></select></label>}
+              {["approve", "resolve", "request_address"].includes(action) && <label>Resolution method<Select value={resolutionMethod} disabled={submitting || (action === "resolve" && Boolean(claim.resolutionMethod))} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></Select></label>}
               {action !== "request_address" && <label>{action === "request_info" ? "What information do you need?" : action === "reject" ? "Reason for rejection" : action === "resolve" ? "Repair or replacement outcome" : "Note to record (optional)"}<textarea autoFocus rows={3} maxLength={2000} required={["request_info", "reject", "resolve"].includes(action)} disabled={submitting} value={note} onChange={event => setNote(event.target.value)}/></label>}
               {action === "approve" && <p>The customer will be asked to provide their address.</p>}
               {action === "request_address" && <p>The customer can submit their address from their claim page.</p>}

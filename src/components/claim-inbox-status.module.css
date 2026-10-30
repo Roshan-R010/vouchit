@@ -3,3 +3,10 @@
 .badge[data-status=UNDER_REVIEW]{color:#1161ce;background:#e9f2ff}
 .badge[data-status=APPROVED],.badge[data-status=RESOLVED]{color:#087f52;background:#e5f7ed}
 .badge[data-status=REJECTED]{color:#d22c45;background:#ffedf0}
+.badge{gap:8px;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:650;line-height:1.2;background:#edf2f9;color:#4e6280}
+.badge:before{content:"";width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:currentColor;opacity:.9}
+.badge[data-status=SUBMITTED]{color:#bd641f;background:#fff0e2}
+.badge[data-status=UNDER_REVIEW]{color:#2166d9;background:#e8f1ff}
+.badge[data-status=INFO_REQUESTED]{color:#866c21;background:#faf1d9}
+.badge[data-status=APPROVED],.badge[data-status=RESOLVED]{color:#239866;background:#e5f6ed}
+.badge[data-status=REJECTED]{color:#d94259;background:#fee9ed}

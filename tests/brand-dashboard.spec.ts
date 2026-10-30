@@ -35,7 +35,7 @@ test("dashboard uses scoped records, working attention links and a responsive bl
       const unit = await tx.productUnit.create({ data: { brandId: brand.id, productModelId: product.id, purchaseOrderId: order.id, serialNumber: `CHECK-${index}` } });
       registrations.push(await tx.warrantyRegistration.create({ data: { unitId: unit.id, customerId: index === 2 ? incomplete.id : owner.id, registeredAt: day(registeredOffset), coverageStartsOn: day(-100), coverageEndsOn: day(expiryOffset) } }));
     }
-    await tx.warrantyClaim.create({ data: { registrationId: registrations[0].id, reference: `DASH-${suffix}`, issueTitle: "Review needed", description: "Dashboard integration check.", status: "SUBMITTED" } });
+    await tx.warrantyClaim.create({ data: { registrationId: registrations[0].id, reference: `DASH-${suffix}`, issueTitle: "Review needed", description: "Dashboard integration check.", issueTags: ["Power issue"], status: "SUBMITTED" } });
     return registrations;
   }, { timeout: 30_000 });
 
@@ -43,10 +43,13 @@ test("dashboard uses scoped records, working attention links and a responsive bl
   const response = await page.request.get(endpoint);
   expect(response.ok()).toBeTruthy();
   const result = await response.json();
-  expect(result.metrics).toEqual({ totalRegistrations: 3, productsCount: 1, expiringSoonCount: 1, missingDetailsCount: 1, needsReviewCount: 1, openClaimsCount: 1 });
+  expect(result.metrics).toMatchObject({ totalRegistrations: 3, productsCount: 1, expiringSoonCount: 1, missingDetailsCount: 1, needsReviewCount: 1, openClaimsCount: 1, periodRegistrations: 2, periodClaims: 1 });
   expect(result.chartData).toHaveLength(30);
   expect(result.chartData.reduce((sum: number, item: { count: number }) => sum + item.count, 0)).toBe(2);
-  expect(result.recentRegistrations.map((row: { id: string }) => row.id)).toEqual([rows[2].id, rows[0].id, rows[1].id]);
+  expect(result.claimSeries.reduce((sum: number, item: { count: number }) => sum + item.count, 0)).toBe(1);
+  expect(result.recentClaims).toHaveLength(1);
+  expect(result.issues.issueCountTotal).toBe(1);
+  expect(result.issues.issueCounts[0]).toMatchObject({ tag: "Power issue", count: 1 });
   const expiring = await (await page.request.get(`${endpoint}/registrations?filter=expiring`)).json();
   expect(expiring.registrations.map((row: { id: string }) => row.id)).toEqual([rows[0].id]);
   const missing = await (await page.request.get(`${endpoint}/registrations?filter=missing_details`)).json();
@@ -56,23 +59,20 @@ test("dashboard uses scoped records, working attention links and a responsive bl
   await page.goto(`/demo/${workspaceId}/brand`);
   await expect(page.getByRole("heading", { name: /Dashboard check/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Warranty summary" }).getByRole("link")).toHaveCount(4);
-  await expect(page.locator("[data-registration-line]")).toHaveAttribute("stroke", "#729cf2");
-  await expect(page.locator("[data-registration-line]")).toHaveAttribute("d", /C /);
-  await expect(page.getByRole("img", { name: "Warranty registrations over the last 30 days" }).locator("circle")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Warranty summary" }).locator("svg").first()).toHaveCSS("color", "rgb(17, 17, 17)");
-  await expect(page.getByRole("region", { name: "Recent registrations" }).locator("tbody tr")).toHaveCount(3);
-  const chartBox = await page.getByRole("region", { name: "Warranty overview" }).boundingBox();
+  await expect(page.getByRole("region", { name: "Recent claims" }).locator("tbody tr")).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Customer issues" }).getByText("Power issue")).toBeVisible();
+  const chartBox = await page.getByRole("region", { name: "Registrations overview" }).boundingBox();
   const attentionBox = await page.getByRole("region", { name: "Needs your attention" }).boundingBox();
   expect(Math.abs(chartBox!.y - attentionBox!.y)).toBeLessThan(2);
   await page.screenshot({ path: testInfo.outputPath("dashboard-desktop.png"), fullPage: true });
-  await page.getByLabel("Warranty overview period").selectOption("90");
+  await page.getByLabel("Dashboard date range").selectOption("90");
   await expect(page.getByText("3 registrations in the last 90 days", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "View warranties", exact: true }).click();
   await expect(page).toHaveURL(/filter=expiring/);
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await page.goto(`/demo/${workspaceId}/brand`);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("heading", { name: "Recent registrations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent claims" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath("dashboard-mobile.png"), fullPage: true });
 });

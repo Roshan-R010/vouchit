@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { AddProductUnit } from "@/components/add-product-unit";
 import { ProductIssueTags } from "@/components/product-issue-tags";
 import { ProductClaimPhotos } from "@/components/product-claim-photos";
@@ -143,7 +144,7 @@ export function BrandProductDetail() {
       {sessionId && productId && <ProductClaimPhotos key={`${productId}-photos`} sessionId={sessionId} productId={productId} initialLimit={product.claimPhotoLimit}/>}
       <section className="business-panel"><div className="business-panel-header"><div><h2>Registration verification</h2><p>Choose the information customers must enter for this product.</p></div></div><div className="business-form-section" style={{ maxWidth: 520 }}>
         {modeError && <p className="business-notice error" role="alert">{modeError}</p>}
-        <label className="business-field"><span>Verification method</span><select value={verificationMode} onChange={event => setVerificationMode(event.target.value)}><option value="UNIT_ONLY">Unit ID</option><option value="ORDER_ONLY">Order ID</option><option value="ORDER_AND_UNIT">Order ID and Unit ID</option></select></label>
+        <label className="business-field"><span>Verification method</span><Select value={verificationMode} onChange={event => setVerificationMode(event.target.value)}><option value="UNIT_ONLY">Unit ID</option><option value="ORDER_ONLY">Order ID</option><option value="ORDER_AND_UNIT">Order ID and Unit ID</option></Select></label>
         <button className="business-button primary" disabled={modeSaving || verificationMode === product.verificationMode} onClick={async () => { setModeSaving(true); setModeError(""); try { const response = await apiFetch(`/api/demo/${sessionId}/brand/products/${productId}/verification`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verificationMode }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error); setProduct((current: any) => ({ ...current, verificationMode })); } catch (cause) { setModeError(cause instanceof Error ? cause.message : "Could not save."); } finally { setModeSaving(false); } }}>Save verification method</button>
       </div></section>
       {sessionId && productId && <AddProductUnit sessionId={sessionId} productId={productId} onSaved={() => setVersion(value => value + 1)}/>}

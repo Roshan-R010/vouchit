@@ -246,12 +246,29 @@ app.post("/api/demo/:sessionId/reset", async (req, res) => {
 // -------------------------------------------------------------
 
 // Brand Dashboard
+app.get("/api/demo/:sessionId/brand/notifications", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  try {
+    const brand = await requireBrand(sessionId);
+    const notifications = await db.demoNotification.findMany({
+      where: { demoSessionId: sessionId, type: NotificationType.CLAIM_SUBMITTED_BRAND, recipientLabel: brand.name },
+      orderBy: { createdAt: "desc" }, take: 5,
+      select: { id: true, subject: true, previewBody: true, relatedId: true, createdAt: true },
+    });
+    res.json({ notifications });
+  } catch (error) {
+    console.error("Brand notifications error:", error);
+    res.status(500).json({ error: "Could not load notifications." });
+  }
+});
+
 app.get("/api/demo/:sessionId/brand", async (req, res) => {
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
   try {
     const brand = await requireBrand(sessionId);
-    const periodDays = req.query.days === "90" ? 90 : 30;
+    const periodDays = req.query.days === "7" ? 7 : req.query.days === "90" ? 90 : 30;
     res.json({ brand, ...await loadBrandDashboard(brand.id, sessionId, periodDays) });
   } catch (error) {
     console.error("Brand dashboard error:", error);

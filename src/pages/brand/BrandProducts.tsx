@@ -1,8 +1,9 @@
+import { Select } from "@/components/select";
 import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, ChevronDown, ChevronRight, Copy, Grid2X2, List, Package, Search } from "lucide-react";
+import { Check, ChevronRight, Copy, Grid2X2, List, Package, Search } from "lucide-react";
 import styles from "./brand-products.module.css";
 
 export function BrandProducts() {
@@ -54,7 +55,7 @@ export function BrandProducts() {
     <div className="business-page-header"><div><h1>Products</h1><p>Manage product models, warranty periods, and registration links.</p></div><div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}><Link to={`/demo/${sessionId}/brand/products/import`} className="business-button">Import units</Link><Link to={`/demo/${sessionId}/brand/products/new`} className="business-button add-product-button">Add product</Link></div></div>
     <div className={styles.toolbar}>
       <label className={styles.search}><Search size={17}/><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" aria-label="Search products"/></label>
-      <label className={styles.filter}><span className="sr-only">Filter products</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All products</option><option value="registered">Registered units</option><option value="empty">No units yet</option></select><ChevronDown size={15}/></label>
+      <label className={styles.filter}><span className="sr-only">Filter products</span><Select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All products</option><option value="registered">Registered units</option><option value="empty">No units yet</option></Select></label>
       <div className={styles.viewSwitch} role="group" aria-label="Catalog view"><button type="button" aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={17}/></button><button type="button" aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")}><List size={18}/></button></div>
     </div>
     {loading ? <div className={styles.empty}>Loading products…</div> : visible.length === 0 ? <div className={styles.empty}>{products.length ? "No products match this search or filter." : "No products yet. Add your first product to get started."}</div> :

@@ -1,8 +1,9 @@
+import { Select } from "@/components/select";
 import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, Inbox, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { shortClaimReference } from "@/lib/claim-reference";
 import { ClaimQuickView } from "@/components/claim-quick-view";
@@ -79,11 +80,13 @@ export function BrandClaims() {
   const pageClaims = sorted.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE);
   const pageNumbers = Array.from({ length: pages }, (_, i) => i + 1).filter(n => n === 1 || n === pages || Math.abs(n - activePage) <= 1);
   const activeTab = ["open", "needs_review", "in_review", "INFO_REQUESTED", "SUBMITTED", "UNDER_REVIEW"].includes(currentStatus) ? "open" : currentStatus === "APPROVED" ? "APPROVED" : ["rejected", "REJECTED"].includes(currentStatus) ? "rejected" : "all";
+  const hasExtraFilters = Boolean(currentSearch || currentProduct || selectedTags.length || !["all", "open", "APPROVED", "rejected"].includes(currentStatus));
+  const emptyText = hasExtraFilters ? ["No matching claims", "Try a different search or adjust your filters."] : activeTab === "open" ? ["No claims waiting in your inbox", "New customer claims will appear here."] : activeTab === "APPROVED" ? ["No approved claims yet", "Claims you approve will appear here."] : activeTab === "rejected" ? ["No rejected claims", "Rejected claims will appear here."] : ["No claims yet", "Customer warranty claims will appear here."];
 
   return <div className={styles.page} data-panel-open={Boolean(selectedClaimId)}>
     <header className={styles.heading}>
       <div><h1>Claims</h1><p>Review and manage warranty claims from your customers.</p></div>
-      <form className={styles.search} onSubmit={submitSearch}><Search size={17}/><input type="search" aria-label="Search claims" placeholder="Search claims, customers, or order IDs…" value={searchTerm} onChange={event => setSearchTerm(event.target.value)}/>{searchTerm && <button type="button" aria-label="Clear search" onClick={() => { setSearchTerm(""); changeFilter("search", ""); }}><X size={15}/></button>}</form>
+      <form className={styles.search} onSubmit={submitSearch}><Search size={18}/><input type="search" aria-label="Search claims" placeholder="Search claims, customers, or order IDs..." value={searchTerm} onChange={event => setSearchTerm(event.target.value)}/>{searchTerm && <button type="button" aria-label="Clear search" onClick={() => { setSearchTerm(""); changeFilter("search", ""); }}><X size={15}/></button>}</form>
     </header>
     <div className={styles.toolbar}>
       <nav className={styles.tabs} aria-label="Claim status">
@@ -94,8 +97,8 @@ export function BrandClaims() {
     <AnimatePresence initial={false}>{filtersOpen && <motion.section id="claim-filters" aria-label="Claim filters" className={styles.filterPanel} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : .2 }} onKeyDown={event => { if (event.key === "Escape") { setFiltersOpen(false); filterButton.current?.focus(); } }}>
       <div className={styles.filterInner}>
         <div className={styles.filterFields}>
-          <label>Status<select value={currentStatus} onChange={event => changeFilter("status", event.target.value)}>{!statusOptions.some(([value]) => value === currentStatus) && <option value={currentStatus}>{currentStatus.replaceAll("_", " ")}</option>}{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label>Product<select value={currentProduct} onChange={event => changeFilter("product", event.target.value)}><option value="">All products</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+          <label>Status<Select value={currentStatus} onChange={event => changeFilter("status", event.target.value)}>{!statusOptions.some(([value]) => value === currentStatus) && <option value={currentStatus}>{currentStatus.replaceAll("_", " ")}</option>}{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
+          <label>Product<Select value={currentProduct} onChange={event => changeFilter("product", event.target.value)}><option value="">All products</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</Select></label>
           <button type="button" className={styles.reset} onClick={() => { setSearchTerm(""); setSearchParams(new URLSearchParams()); }}>Reset filters</button>
         </div>
         <div className={styles.tagHeading}>Issue tags <span>Select one or more</span></div>
@@ -103,7 +106,7 @@ export function BrandClaims() {
       </div>
     </motion.section>}</AnimatePresence>
     <section className={styles.tablePanel} aria-label="Warranty claims" aria-busy={loading}>
-      {loading ? <div className={styles.empty} role="status"><span className={styles.loader}/>Loading claims…</div> : error ? <div className={styles.empty} role="alert"><p>{error}</p><button onClick={refreshClaims}>Try again</button></div> : !claims.length ? <div className={styles.empty}><Inbox size={30}/><h2>No claims found</h2><p>{currentSearch || currentProduct || selectedTags.length ? "Try a different search or adjust your filters." : "Claims in this view will appear here."}</p></div> : <div className={styles.tableScroll}><table className={styles.table}>
+      {loading ? <div className={styles.empty} role="status"><span className={styles.loader}/>Loading claims…</div> : error ? <div className={styles.empty} role="alert"><p>{error}</p><button onClick={refreshClaims}>Try again</button></div> : !claims.length ? <div className={styles.empty}><h2>{emptyText[0]}</h2><p>{emptyText[1]}</p>{hasExtraFilters && <button type="button" onClick={() => { setSearchTerm(""); setSearchParams(new URLSearchParams()); }}>Reset filters</button>}</div> : <div className={styles.tableScroll}><table className={styles.table}>
         <thead><tr><th>Claim ID</th><th>Customer</th><th>Product</th><th>Issue</th><th>Status</th><th aria-sort={oldestFirst ? "ascending" : "descending"}><button type="button" onClick={() => setOldestFirst(value => !value)}>Date {oldestFirst ? <ArrowUp size={13}/> : <ArrowDown size={13}/>}</button></th></tr></thead>
         <tbody>{pageClaims.map(claim => <tr key={claim.id} className={selectedClaimId === claim.id ? styles.selected : undefined} onClick={() => setSelectedClaimId(claim.id)}>
           <td><button type="button" className={styles.claimLink} aria-label={`Open claim ${claim.reference}`} aria-expanded={selectedClaimId === claim.id} aria-controls={selectedClaimId === claim.id ? "claim-detail-panel" : undefined} onClick={() => setSelectedClaimId(claim.id)} title={claim.reference}>{shortClaimReference(claim.reference)}</button></td>

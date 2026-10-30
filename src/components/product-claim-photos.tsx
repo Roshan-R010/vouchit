@@ -1,52 +1,26 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Select } from "@/components/select";
+import { useState, type FormEvent } from "react";
+import { Check } from "lucide-react";
 import styles from "./product-claim-photos.module.css";
 import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 
 export function ClaimPhotoLimitField({ value, onChange, disabled = false }: { value: number; onChange: (value: number) => void; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!dropdownRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
   return <div className={styles.settings}>
     <label className={styles.photoToggle}>
-      <input className={styles.checkbox} type="checkbox" checked={value > 0} disabled={disabled} onChange={event => { onChange(event.target.checked ? 3 : 0); setOpen(false); }}/>
+      <input className={styles.checkbox} type="checkbox" checked={value > 0} disabled={disabled} onChange={event => onChange(event.target.checked ? 3 : 0)}/>
       <span className={styles.checkboxFace} aria-hidden="true"><Check size={15} strokeWidth={3}/></span>
       <span>Allow photos for this product</span>
     </label>
-    {value > 0 && <div className={styles.limitRow}>
-      <span id="claim-photo-limit-label" className={styles.limitLabel}>Maximum photos per claim</span>
-      <div className={styles.dropdown} ref={dropdownRef}>
-        <button type="button" className={styles.dropdownTrigger} aria-label={`Maximum photos per claim: ${value}`} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen(current => !current)} onKeyDown={event => {
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            if (open) onChange(Math.min(3, Math.max(1, value + (event.key === "ArrowDown" ? 1 : -1))));
-            else setOpen(true);
-          }
-        }}><span>{value} {value === 1 ? "photo" : "photos"}</span><ChevronDown size={18} className={open ? styles.chevronOpen : ""}/></button>
-        {open && <div className={styles.dropdownMenu} role="listbox" aria-labelledby="claim-photo-limit-label">{[1, 2, 3].map(count => <button type="button" role="option" aria-selected={value === count} className={styles.dropdownOption} key={count} onClick={() => { onChange(count); setOpen(false); dropdownRef.current?.querySelector<HTMLButtonElement>(`button.${styles.dropdownTrigger}`)?.focus(); }}>{count} {count === 1 ? "photo" : "photos"}{value === count && <Check size={16} aria-hidden="true"/>}</button>)}</div>}
-      </div>
-    </div>}
+    {value > 0 && <label className={styles.limitRow}>
+      <span className={styles.limitLabel}>Maximum photos per claim</span>
+      <Select className={styles.dropdown} value={value} disabled={disabled} aria-label="Maximum photos per claim" onChange={event => onChange(Number(event.target.value))}>
+        {[1, 2, 3].map(count => <option key={count} value={count}>{count} {count === 1 ? "photo" : "photos"}</option>)}
+      </Select>
+    </label>}
     <p className={styles.hint}>{value > 0 ? `Customers can attach up to ${value} ${value === 1 ? "photo" : "photos"} when they submit a claim.` : "Customers cannot attach photos when they submit a claim."} Changing this does not remove photos from existing claims.</p>
   </div>;
 }
-
 export function ProductClaimPhotos({ sessionId, productId, initialLimit }: { sessionId: string; productId: string; initialLimit: number }) {
   const [limit, setLimit] = useState(initialLimit);
   const [savedLimit, setSavedLimit] = useState(initialLimit);

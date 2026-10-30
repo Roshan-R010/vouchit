@@ -74,3 +74,8 @@
 .brand-shell .brand-rail-mark .vouch-wordmark-dot{color:#ef514b}
 .brand-shell[data-nav-expanded=false] .brand-rail-header-panel{visibility:hidden}
 @media(max-width:760px){.brand-shell .brand-rail-workspace{margin:0}}
+.brand-shell[data-dashboard=true] .business-main{min-height:100vh;background:#e9eef5}
+.brand-shell[data-dashboard=true] .business-topbar{background:#f3f6fa;border-bottom-color:#d6deea}
+.brand-shell[data-dashboard=true] .business-content{padding-top:18px}
+.brand-topbar-mobile-title{display:none}
+@media(max-width:760px){.brand-shell[data-dashboard=true] .business-content{padding-top:14px}.brand-shell[data-dashboard=true] .brand-topbar-crumb{display:none}.brand-shell[data-dashboard=true] .brand-topbar-mobile-title{display:inline;font-weight:700;color:#25354b}}

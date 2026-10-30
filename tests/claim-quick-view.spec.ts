@@ -64,6 +64,13 @@ test("claims layout groups filters, paginates, and opens a responsive panel", as
   await page.getByRole("button", { name: "Next page", exact: true }).click();
   await expect(page.locator("tbody tr")).toHaveCount(2);
   await page.getByRole("button", { name: "Previous page", exact: true }).click();
+  await page.screenshot({ path: ".vouch/claims-list-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Close navigation" }).click({ position: { x: 370, y: 300 } });
+  await expect.poll(() => page.locator(".brand-rail-sidebar").evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(66);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: ".vouch/claims-list-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1672, height: 941 });
   await page.getByRole("button", { name: "Open claim CLM-10432", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Claim details" });
   await expect(panel.getByRole("heading", { name: "CLM-10432" })).toBeVisible();
@@ -102,7 +109,11 @@ test("brand completes review, information request, approval and resolution insid
   claims[0].messages.push({ id: "reply", author: "CUSTOMER", body: "I used the original charger.", createdAt: new Date().toISOString() });
   await panel.getByRole("button", { name: "Refresh claim" }).click();
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
-  await panel.getByLabel("Resolution method").selectOption("REPLACEMENT");
+  await panel.getByRole("combobox", { name: "Resolution method" }).click();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("combobox", { name: "Resolution method" }).click();
+  await page.getByRole("listbox").getByRole("option", { name: "Replacement", exact: true }).click();
   await panel.getByRole("button", { name: "Approve claim", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Mark as resolved", exact: true })).toBeDisabled();
   claims[0].addressRequest = { receivedAt: new Date().toISOString(), recipient: "Sarah Mitchell", line1: "123 Example Street", city: "Chennai", region: "Tamil Nadu", postalCode: "600001", country: "India", phone: "+910000000000" };

@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 import React, { useState } from "react";
@@ -119,7 +120,7 @@ export function BrandNewProduct() {
             </div>
           </div>
 
-          <div className="business-field"><label>Registration verification</label><select value={verificationMode} onChange={event => setVerificationMode(event.target.value)}><option value="UNIT_ONLY">Unit ID</option><option value="ORDER_ONLY">Order ID</option><option value="ORDER_AND_UNIT">Order ID and Unit ID</option></select><small>Choose what customers must enter when registering this product.</small></div>
+          <div className="business-field"><label>Registration verification</label><Select value={verificationMode} onChange={event => setVerificationMode(event.target.value)}><option value="UNIT_ONLY">Unit ID</option><option value="ORDER_ONLY">Order ID</option><option value="ORDER_AND_UNIT">Order ID and Unit ID</option></Select><small>Choose what customers must enter when registering this product.</small></div>
 
           <IssueTagEditor value={issueTags} onChange={setIssueTags} disabled={submitting}/>
           <ClaimPhotoLimitField value={claimPhotoLimit} onChange={setClaimPhotoLimit} disabled={submitting}/>
