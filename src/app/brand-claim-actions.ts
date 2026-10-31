@@ -1,6 +1,6 @@
 "use server";
 
-import { ActorRole, ClaimStatus, ResolutionMethod } from "@prisma/client";
+import { ActorRole, ClaimStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireBrand } from "@/lib/brand";
 import { db } from "@/lib/db";
@@ -12,7 +12,6 @@ const transitions: Record<string, { from: ClaimStatus; to: ClaimStatus; note: st
   approve: { from: ClaimStatus.UNDER_REVIEW, to: ClaimStatus.APPROVED, note: "The brand approved this claim." },
   reject: { from: ClaimStatus.UNDER_REVIEW, to: ClaimStatus.REJECTED, note: "The brand rejected this claim." },
   request_info: { from: ClaimStatus.UNDER_REVIEW, to: ClaimStatus.INFO_REQUESTED, note: "The brand requested more information." },
-  resolve: { from: ClaimStatus.APPROVED, to: ClaimStatus.RESOLVED, note: "The brand resolved this claim." },
 };
 
 class ClaimActionError extends Error {}
@@ -27,16 +26,10 @@ export async function changeBrandClaimStatusAction(
   const decision = String(formData.get("decision") || "");
   const transition = Object.prototype.hasOwnProperty.call(transitions, decision) ? transitions[decision] : undefined;
   const note = String(formData.get("note") || "").trim();
-  const resolution = String(formData.get("resolutionMethod") || "");
 
   if (!transition) return { error: "Choose a valid claim action." };
   if (note.length > 2000) return { error: "Keep your message under 2,000 characters." };
-  if (["reject", "request_info", "resolve"].includes(decision) && !note) {
-    return { error: decision === "request_info" ? "Enter the question you want the customer to answer." : decision === "resolve" ? "Describe the repair or replacement outcome." : "Enter a reason for rejecting this claim." };
-  }
-  if (decision === "resolve" && resolution !== ResolutionMethod.REPAIR && resolution !== ResolutionMethod.REPLACEMENT) {
-    return { error: "Choose whether the product was repaired or replaced." };
-  }
+  if (["reject", "request_info"].includes(decision) && !note) return { error: decision === "request_info" ? "Enter the question you want the customer to answer." : "Enter a reason for rejecting this claim." };
 
   try {
     await db.$transaction(async (tx) => {
@@ -53,16 +46,11 @@ export async function changeBrandClaimStatusAction(
 
       const changed = await tx.warrantyClaim.updateMany({
         where: { ...scope, status: transition.from },
-        data: {
-          status: transition.to,
-          ...(decision === "resolve" ? { resolutionMethod: resolution as ResolutionMethod } : {}),
-        },
+        data: { status: transition.to },
       });
       if (changed.count !== 1) throw new ClaimActionError("Another update was made to this claim. Refresh the page and try again.");
 
-      const eventNote = decision === "resolve"
-        ? `${resolution === ResolutionMethod.REPAIR ? "Repaired" : "Replaced"}: ${note}`
-        : note || transition.note;
+      const eventNote = note || transition.note;
       await tx.claimEvent.create({ data: { claimId, actor: ActorRole.BRAND, fromStatus: transition.from, toStatus: transition.to, note: eventNote } });
       if (note) await tx.claimMessage.create({ data: { claimId, author: ActorRole.BRAND, body: eventNote } });
     }, { maxWait: 10_000, timeout: 20_000 });

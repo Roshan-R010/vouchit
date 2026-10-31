@@ -23,7 +23,7 @@ export function summarizeIssues(products: { id: string; issueTags: string[] }[],
 
 export async function loadAnalytics(brandId: string, sessionId: string, periodDays: number) {
   const [registrations, claims, products] = await Promise.all([
-    db.warrantyRegistration.findMany({ where: { unit: { brandId }, customer: { demoSessionId: sessionId } }, select: { registeredAt: true, coverageEndsOn: true, unit: { select: { productModelId: true } } } }),
+    db.warrantyRegistration.findMany({ where: { unit: { brandId }, customer: { demoSessionId: sessionId } }, select: { active: true, registeredAt: true, coverageEndsOn: true, unit: { select: { productModelId: true } } } }),
     db.warrantyClaim.findMany({ where: { registration: { unit: { brandId }, customer: { demoSessionId: sessionId } } }, select: { status: true, issueTags: true, submittedAt: true, registration: { select: { unit: { select: { productModelId: true } } } }, events: { where: { toStatus: "RESOLVED" }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } } }),
     db.productModel.findMany({ where: { brandId }, select: { id: true, name: true, issueTags: true }, orderBy: { name: "asc" } }),
   ]);
@@ -41,12 +41,12 @@ export async function loadAnalytics(brandId: string, sessionId: string, periodDa
     periodDays,
     metrics: {
       totalRegistrations: registrations.length,
-      activeRegistrations: registrations.filter(r => r.coverageEndsOn >= today).length,
+      activeRegistrations: registrations.filter(r => r.active && r.coverageEndsOn >= today).length,
       totalClaims: claims.length,
-      openClaims: claims.filter(c => ["SUBMITTED", "UNDER_REVIEW", "INFO_REQUESTED"].includes(c.status)).length,
+      openClaims: claims.filter(c => ["SUBMITTED", "UNDER_REVIEW", "INFO_REQUESTED", "APPROVED"].includes(c.status)).length,
       approvalRate: decided ? Math.round(approved / decided * 100) : null,
       averageResolutionHours: resolvedHours.length ? Math.round(resolvedHours.reduce((sum, h) => sum + h, 0) / resolvedHours.length * 10) / 10 : null,
-      resolvedClaims: resolvedHours.length,
+      resolvedClaims: claims.filter(c => c.status === "RESOLVED").length,
     },
     trend,
     statusCounts: ["SUBMITTED", "UNDER_REVIEW", "INFO_REQUESTED", "APPROVED", "REJECTED", "RESOLVED"].map(status => ({ status, count: claims.filter(c => c.status === status).length })),

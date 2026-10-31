@@ -1,4 +1,3 @@
-import { Select } from "@/components/select";
 import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 import { formatDate } from "@/lib/dates";
@@ -13,8 +12,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import styles from "./claim-quick-view.module.css";
 
 type Props = { sessionId: string; claimId: string; onClose: () => void; onUpdated?: () => void };
-type Decision = "approve" | "reject" | "request_info" | "resolve" | "request_address";
-const actionLabels: Record<Decision, string> = { approve: "Approve claim", reject: "Reject claim", request_info: "Request information", resolve: "Mark as resolved", request_address: "Request customer address" };
+type Decision = "approve" | "reject" | "request_info";
+const actionLabels: Record<Decision, string> = { approve: "Approve claim", reject: "Reject claim", request_info: "Request information" };
 function timestamp(value: string) {
   return `${formatDate(value)} · ${new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(value))}`;
 }
@@ -44,7 +43,6 @@ function ClaimPanelContent({ sessionId, claimId, onClose, onUpdated, closeRef }:
   const [notice, setNotice] = useState("");
   const [action, setAction] = useState<Decision | null>(null);
   const [note, setNote] = useState("");
-  const [resolutionMethod, setResolutionMethod] = useState("REPAIR");
   const [submitting, setSubmitting] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const alive = useRef(true);
@@ -56,7 +54,7 @@ function ClaimPanelContent({ sessionId, claimId, onClose, onUpdated, closeRef }:
     setRefreshing(true); setLoadError("");
     try {
       const data = await apiFetch(endpoint, { cache: "no-store" }).then(readApiResponse);
-      if (alive.current && version === requestVersion.current) { setClaim(data.claim); setResolutionMethod(data.claim.resolutionMethod || "REPAIR"); }
+      if (alive.current && version === requestVersion.current) setClaim(data.claim);
     } catch (cause) {
       if (alive.current && version === requestVersion.current) setLoadError(cause instanceof Error ? cause.message : "Could not load claim.");
     } finally {
@@ -70,9 +68,9 @@ function ClaimPanelContent({ sessionId, claimId, onClose, onUpdated, closeRef }:
     if (submitting) return;
     setSubmitting(true); setError(""); setNotice("");
     try {
-      const data = await apiFetch(`${endpoint}/${decision === "request_address" ? "request-address" : "action"}`, {
+      const data = await apiFetch(`${endpoint}/action`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, note: note.trim(), resolutionMethod: ["approve", "resolve", "request_address"].includes(decision) ? resolutionMethod : undefined }),
+        body: JSON.stringify({ decision, note: note.trim() }),
       }).then(readApiResponse);
       onUpdated?.();
       if (!alive.current) return;
@@ -108,19 +106,16 @@ function ClaimPanelContent({ sessionId, claimId, onClose, onUpdated, closeRef }:
             <div className={styles.actions} aria-label="Claim actions">
               {claim.status === "SUBMITTED" && <button className={styles.primary} disabled={disabled} onClick={() => void runAction("review")}><FileText size={15}/>{submitting ? "Starting review…" : "Start review"}</button>}
               {claim.status === "UNDER_REVIEW" && <><button className={styles.primary} disabled={disabled} onClick={() => chooseAction("approve")}><Check size={16}/> Approve</button><button disabled={disabled} onClick={() => chooseAction("request_info")}><MessageSquare size={15}/> Request info</button><button disabled={disabled} onClick={() => chooseAction("reject")}><X size={16}/> Reject</button></>}
-              {claim.status === "APPROVED" && <>{!address ? <button className={styles.primary} disabled={disabled} onClick={() => chooseAction("request_address")}><MapPin size={15}/> Request address</button> : <button className={styles.primary} disabled={disabled || !address.receivedAt} onClick={() => chooseAction("resolve")}><Check size={16}/> Mark as resolved</button>}</>}
+              {claim.status === "APPROVED" && <Link className={styles.primary} to={fullPath}><Check size={16}/> Manage resolution</Link>}
             </div>
             {claim.status === "INFO_REQUESTED" && <p className={styles.stateNote}>Waiting for the customer’s reply. Refresh to check for updates.</p>}
-            {claim.status === "APPROVED" && address && !address.receivedAt && <p className={styles.stateNote}>Waiting for the customer’s address before completing the {claim.resolutionMethod === "REPLACEMENT" ? "replacement" : "repair"}.</p>}
+            {claim.status === "APPROVED" && <p className={styles.stateNote}>{claim.resolution ? `${claim.resolution.type.toLowerCase()} · ${claim.resolution.step.toLowerCase().replaceAll("_", " ")}` : "Approved; resolution has not started."}</p>}
             {claim.status === "RESOLVED" && <p className={styles.completed}><Check size={15}/> This claim is resolved.</p>}
             {claim.status === "REJECTED" && <p className={styles.stateNote}>This claim is closed. The decision is recorded in the activity timeline.</p>}
 
             {action && <form className={styles.actionForm} onSubmit={submit}>
               <h3>{actionLabels[action]}</h3>
-              {["approve", "resolve", "request_address"].includes(action) && <label>Resolution method<Select value={resolutionMethod} disabled={submitting || (action === "resolve" && Boolean(claim.resolutionMethod))} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></Select></label>}
-              {action !== "request_address" && <label>{action === "request_info" ? "What information do you need?" : action === "reject" ? "Reason for rejection" : action === "resolve" ? "Repair or replacement outcome" : "Note to record (optional)"}<textarea autoFocus rows={3} maxLength={2000} required={["request_info", "reject", "resolve"].includes(action)} disabled={submitting} value={note} onChange={event => setNote(event.target.value)}/></label>}
-              {action === "approve" && <p>The customer will be asked to provide their address.</p>}
-              {action === "request_address" && <p>The customer can submit their address from their claim page.</p>}
+              <label>{action === "request_info" ? "What information do you need?" : action === "reject" ? "Reason for rejection" : "Note to record (optional)"}<textarea autoFocus rows={3} maxLength={2000} required={["request_info", "reject"].includes(action)} disabled={submitting} value={note} onChange={event => setNote(event.target.value)}/></label>
               <div><button type="button" onClick={() => setAction(null)} disabled={submitting}>Cancel</button><button className={action === "reject" ? styles.danger : styles.primary} disabled={disabled} type="submit">{submitting ? "Saving…" : actionLabels[action]}</button></div>
             </form>}
             {error && <p className={styles.error} role="alert">{error}</p>}

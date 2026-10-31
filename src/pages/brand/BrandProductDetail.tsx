@@ -5,6 +5,7 @@ import { ProductClaimPhotos } from "@/components/product-claim-photos";
 import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
 import { ProductImageEditor } from "@/components/product-image-editor";
+import { BrandUnitLifecycle } from "@/components/brand-unit-lifecycle";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Package, ExternalLink, ImagePlus, ChevronDown } from "lucide-react";
@@ -35,6 +36,7 @@ export function BrandProductDetail() {
   const [modeSaving, setModeSaving] = useState(false);
   const [modeError, setModeError] = useState("");
   const [verificationMode, setVerificationMode] = useState("UNIT_ONLY");
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionId || !productId) return;
@@ -177,6 +179,8 @@ export function BrandProductDetail() {
                   <th>PURCHASE ORDER</th>
                   <th>DELIVERY DATE</th>
                   <th>REGISTRATION STATUS</th>
+                  <th>UNIT STATUS</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -187,7 +191,7 @@ export function BrandProductDetail() {
                     </td>
                     <td className="business-mono">{u.purchaseOrder?.orderNumber || "—"}</td>
                     <td className="business-mono">
-                      {u.purchaseOrder?.deliveredOn ? formatDate(u.purchaseOrder.deliveredOn) : "Pending"}
+                      {u.sales?.[0]?.confirmedDeliveredOn ? formatDate(u.sales[0].confirmedDeliveredOn) : "Pending"}
                     </td>
                     <td>
                       {u.registration ? (
@@ -196,6 +200,8 @@ export function BrandProductDetail() {
                         <span className="business-badge">Unregistered</span>
                       )}
                     </td>
+                    <td><span className="business-badge">{({ PENDING: "Pending", DELIVERED: "Delivered", RETURNED: "Returned", FOR_SALE_AGAIN: "For Sale Again" } as Record<string, string>)[u.status] ?? u.status}</span></td>
+                    <td><button type="button" className="business-button small" onClick={() => setSelectedUnitId(u.id)}>Details</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -206,6 +212,7 @@ export function BrandProductDetail() {
         </motion.div>}
         </AnimatePresence>
       </div>
+      {selectedUnitId && sessionId && <BrandUnitLifecycle key={selectedUnitId} sessionId={sessionId} unitId={selectedUnitId} onChanged={() => setVersion(value => value + 1)} onClose={() => setSelectedUnitId(null)}/>}
     </div>
   );
 }

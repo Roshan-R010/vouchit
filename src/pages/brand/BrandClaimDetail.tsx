@@ -8,6 +8,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar, ChevronDown } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { shortClaimReference } from "@/lib/claim-reference";
+import { ClaimResolutionPanel } from "@/components/claim-resolution-panel";
 import historyStyles from "./claim-history.module.css";
 import styles from "./claim-detail.module.css";
 
@@ -40,7 +41,6 @@ export function BrandClaimDetail() {
   // Form states for actions
   const [decision, setDecision] = useState<string>("approve");
   const [note, setNote] = useState<string>("");
-  const [resolutionMethod, setResolutionMethod] = useState<string>("REPAIR");
   const [requestingAddress, setRequestingAddress] = useState(false);
 
   const loadClaim = () => {
@@ -51,11 +51,9 @@ export function BrandClaimDetail() {
       .then((data) => {
         if (data.claim) {
           setClaim(data.claim);
-          setResolutionMethod(data.claim.resolutionMethod || "REPAIR");
           // Set default decision based on status
           if (data.claim.status === "SUBMITTED") setDecision("review");
           else if (data.claim.status === "UNDER_REVIEW") setDecision(["approve", "request_info", "reject"].includes(searchParams.get("decision") || "") ? searchParams.get("decision")! : "approve");
-          else if (data.claim.status === "APPROVED") setDecision("resolve");
         }
         setLoading(false);
       })
@@ -83,7 +81,6 @@ export function BrandClaimDetail() {
         body: JSON.stringify({
           decision,
           note,
-          resolutionMethod: decision === "resolve" || decision === "approve" ? resolutionMethod : undefined,
         }),
       });
 
@@ -106,7 +103,7 @@ export function BrandClaimDetail() {
     if (!sessionId || !claimId || requestingAddress) return;
     setRequestingAddress(true); setError(null); setSuccess(null);
     try {
-      const response = await apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}/request-address`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resolutionMethod }) });
+      const response = await apiFetch(`/api/demo/${sessionId}/brand/claims/${claimId}/request-address`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resolutionMethod: claim.resolution?.type }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not request the address.");
       setSuccess("Address requested from the customer.");
@@ -160,6 +157,7 @@ export function BrandClaimDetail() {
 
       {success && <div className="business-notice">{success}</div>}
       {error && <div className="business-notice error">{error}</div>}
+      {claim.requiresReturnReview && <div className="business-notice">This unit was returned while the claim was open. Review the claim and its warranty history before taking further action.</div>}
 
       <div className={styles.columns}>
         {/* Left Column: Details, Unit, Events */}
@@ -241,7 +239,7 @@ export function BrandClaimDetail() {
 
                   <h3 style={{ fontSize: "15px", margin: "0 0 6px" }}>Claim resolved</h3>
                   <p style={{ fontSize: "14px", color: "#6a7b68", margin: 0 }}>
-                    Resolution: {claim.resolutionMethod === "REPAIR" ? "Repair" : claim.resolutionMethod === "REPLACEMENT" ? "Replacement" : "Not recorded"}.
+                    Resolution: {claim.resolution?.type ? claim.resolution.type.toLowerCase() : "Completed"}.
                   </p>
                 </div>
               )}
@@ -264,8 +262,8 @@ export function BrandClaimDetail() {
                 </div>
               )}
 
-              {/* Action Form if SUBMITTED, UNDER_REVIEW, or APPROVED */}
-              {(status === "SUBMITTED" || status === "UNDER_REVIEW" || status === "APPROVED") && (
+              {/* Review actions remain separate from operational resolution. */}
+              {(status === "SUBMITTED" || status === "UNDER_REVIEW") && (
                 <form onSubmit={handleActionSubmit}>
                   {status === "SUBMITTED" && (
                     <div>
@@ -298,8 +296,6 @@ export function BrandClaimDetail() {
                           <option value="reject">Reject claim</option>
                         </Select>
                       </div>
-
-                      {decision === "approve" && <div className="business-field"><label>Planned resolution</label><Select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)} required><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></Select><p className="business-hint">Approving will ask the customer for a delivery or collection address.</p></div>}
 
                       <div className="business-field">
                         <label>
@@ -344,32 +340,12 @@ export function BrandClaimDetail() {
                     </div>
                   )}
 
-                  {status === "APPROVED" && (
-                    <div>
-                      <p className={styles.plan}>
-                        <strong>{claim.resolutionMethod === "REPLACEMENT" ? "Replacement" : "Repair"} approved.</strong> {claim.addressRequest?.receivedAt ? "Record the outcome once completed." : "Waiting for the customer’s address."}
-                      </p>
-
-                      <div className="business-field">
-                        <label>Outcome Details *</label>
-                        <textarea
-                          placeholder="Describe the repair or replacement and include any relevant delivery details."
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          rows={3}
-                          required
-                        />
-                      </div>
-
-                      <button type="submit" disabled={submitting || !claim.addressRequest?.receivedAt} className="business-button primary" style={{ width: "100%" }}>
-                        {submitting ? "Resolving..." : claim.addressRequest?.receivedAt ? "Mark as Resolved" : "Waiting for customer address"}
-                      </button>
-                    </div>
-                  )}
                 </form>
               )}
             </div>
           </div>
+
+          <ClaimResolutionPanel key={claim.resolution?.id ?? claim.id} sessionId={sessionId!} claim={claim} onChanged={loadClaim}/>
 
           {/* Customer Summary Card */}
           <div className="business-panel">
@@ -381,7 +357,7 @@ export function BrandClaimDetail() {
               <dl className={styles.contact}><div><dt>Name</dt><dd>{customer.name}</dd></div><div><dt>Email</dt><dd>{customer.email}</dd></div></dl>
               {(status === "APPROVED" || status === "RESOLVED") && <section className={styles.address} aria-label="Customer address">
                 <h3>Delivery / collection address</h3>
-                {claim.addressRequest?.receivedAt ? <address><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address> : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p> : <><p>This claim has no address request.</p>{status === "APPROVED" && <>{!claim.resolutionMethod && <div className="business-field"><label>Planned resolution</label><Select value={resolutionMethod} onChange={event => setResolutionMethod(event.target.value)}><option value="REPAIR">Repair</option><option value="REPLACEMENT">Replacement</option></Select></div>}<button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button></>}</>}
+                {claim.addressRequest?.receivedAt ? <address><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address> : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p> : <><p>This claim has no address request.</p>{status === "APPROVED" && ["REPAIR", "REPLACEMENT"].includes(claim.resolution?.type) && claim.resolution?.status === "IN_PROGRESS" && <button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button>}</>}
               </section>}
             </div>
           </div>

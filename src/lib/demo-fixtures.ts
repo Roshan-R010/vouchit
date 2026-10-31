@@ -19,9 +19,13 @@ export async function seedDemo(tx: Prisma.TransactionClient, sessionId?: string)
   for (const fixture of fixtures) {
     const deliveredOn = dateOnly(new Date(`${fixture.delivered}T00:00:00.000Z`));
     const order = await tx.purchaseOrder.create({ data: { brandId: brand.id, customerId: customer.id, orderNumber: fixture.order, deliveredOn } });
-    const unit = await tx.productUnit.create({ data: { brandId: brand.id, productModelId: fixture.model.id, purchaseOrderId: order.id, serialNumber: fixture.serial } });
+    const unit = await tx.productUnit.create({ data: { brandId: brand.id, productModelId: fixture.model.id, purchaseOrderId: order.id, serialNumber: fixture.serial, status: "DELIVERED" } });
+    const sale = await tx.unitSale.create({ data: { unitId: unit.id, purchaseOrderId: order.id, confirmedDeliveredOn: deliveredOn } });
+    await tx.unitLifecycleEvent.createMany({ data: [{ unitId: unit.id, eventType: "CREATED", source: "demo" }, { unitId: unit.id, eventType: "ORDER_ASSOCIATED", source: "demo", orderNumber: fixture.order }, { unitId: unit.id, eventType: "DELIVERED", source: "demo", orderNumber: fixture.order, detail: fixture.delivered }] });
     if (!fixture.register) continue;
-    const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, customerId: customer.id, coverageStartsOn: deliveredOn, coverageEndsOn: addCalendarMonths(deliveredOn, fixture.model.warrantyMonths) } });
+    const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, saleId: sale.id, customerId: customer.id, coverageStartsOn: deliveredOn, coverageEndsOn: addCalendarMonths(deliveredOn, fixture.model.warrantyMonths) } });
+    await tx.productUnit.update({ where: { id: unit.id }, data: { activeRegistrationId: registration.id } });
+    await tx.unitLifecycleEvent.create({ data: { unitId: unit.id, eventType: "REGISTERED", source: "demo", orderNumber: fixture.order } });
     if (fixture.sampleClaim) {
       const claim = await tx.warrantyClaim.create({ data: { registrationId: registration.id, reference: `VCH-${session.id.toUpperCase()}`, issueTitle: "Left earcup has stopped working", description: "The left side stopped producing sound during normal use.", status: ClaimStatus.UNDER_REVIEW } });
       await tx.claimEvent.create({ data: { claimId: claim.id, actor: ActorRole.CUSTOMER, toStatus: ClaimStatus.SUBMITTED, note: "Claim submitted" } });

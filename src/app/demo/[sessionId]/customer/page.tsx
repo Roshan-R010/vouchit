@@ -41,7 +41,7 @@ export default async function CustomerDashboard({ params, searchParams }: Props)
   }
 
   const registrations = await db.warrantyRegistration.findMany({
-    where: { customerId: customer.id, unit: { brand: { demoSessionId: sessionId } } },
+    where: { customerId: customer.id, active: true, unit: { brand: { demoSessionId: sessionId } } },
     include: {
       unit: { include: { productModel: true, purchaseOrder: true, brand: true } },
       claim: true,

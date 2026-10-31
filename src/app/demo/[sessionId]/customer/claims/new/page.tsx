@@ -19,20 +19,20 @@ export default async function NewClaimPage({ params, searchParams }: Props) {
 
   const registration = unitId
     ? await db.warrantyRegistration.findFirst({
-        where: { unitId, customer: { demoSessionId: sessionId } },
+        where: { unitId, active: true, customer: { demoSessionId: sessionId } },
         include: {
           claim: { select: { id: true } },
-          unit: { include: { productModel: true, purchaseOrder: true } },
+          unit: { include: { productModel: true, purchaseOrder: true } }, sale: true,
         },
       })
     : null;
 
   if (!registration) {
     const allRegistrations = await db.warrantyRegistration.findMany({
-      where: { customer: { demoSessionId: sessionId } },
+      where: { active: true, customer: { demoSessionId: sessionId } },
       include: {
         claim: { select: { id: true } },
-        unit: { include: { productModel: true, purchaseOrder: true } },
+        unit: { include: { productModel: true, purchaseOrder: true } }, sale: true,
       },
       orderBy: { registeredAt: "desc" },
     });
@@ -141,8 +141,8 @@ export default async function NewClaimPage({ params, searchParams }: Props) {
               </strong>
               <p>
                 Unit {registration.unit.serialNumber} · Delivered{" "}
-                {registration.unit.purchaseOrder!.deliveredOn
-                  ? formatDate(registration.unit.purchaseOrder!.deliveredOn)
+                {registration.sale?.confirmedDeliveredOn
+                  ? formatDate(registration.sale.confirmedDeliveredOn)
                   : "—"}{" "}
                 · Covered through {formatDate(registration.coverageEndsOn)}
               </p>

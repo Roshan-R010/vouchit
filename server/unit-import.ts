@@ -142,14 +142,18 @@ export async function commitImport(brandId: string, accountId: string, options: 
   const result = await db.$transaction(async tx => {
     const orders = [...new Set(valid.map(row => row.orderId).filter(Boolean))];
     for (let i = 0; i < orders.length; i += 500) await tx.purchaseOrder.createMany({ data: orders.slice(i, i + 500).map(orderNumber => ({ brandId, orderNumber })), skipDuplicates: true });
-    const linkedOrders = await tx.purchaseOrder.findMany({ where: { brandId, orderNumber: { in: orders } }, select: { id: true, orderNumber: true } });
+    const linkedOrders = await tx.purchaseOrder.findMany({ where: { brandId, orderNumber: { in: orders } }, select: { id: true, orderNumber: true, deliveredOn: true } });
     const orderIds = new Map(linkedOrders.map(order => [order.orderNumber, order.id]));
-    for (let i = 0; i < valid.length; i += 500) await tx.productUnit.createMany({ data: valid.slice(i, i + 500).map(row => ({ id: ids.get(row.rowNumber)!, brandId, productModelId: row.productId!, purchaseOrderId: row.orderId ? orderIds.get(row.orderId) : null, serialNumber: row.unitId })), skipDuplicates: true });
+    const orderDates = new Map(linkedOrders.map(order => [order.orderNumber, order.deliveredOn]));
+    for (let i = 0; i < valid.length; i += 500) await tx.productUnit.createMany({ data: valid.slice(i, i + 500).map(row => ({ id: ids.get(row.rowNumber)!, brandId, productModelId: row.productId!, purchaseOrderId: row.orderId ? orderIds.get(row.orderId) : null, serialNumber: row.unitId, status: row.orderId && orderDates.get(row.orderId) ? "DELIVERED" as const : "PENDING" as const })), skipDuplicates: true });
     const created = await tx.productUnit.findMany({ where: { brandId, id: { in: [...ids.values()] } }, select: { id: true } });
     const createdIds = new Set(created.map(unit => unit.id));
+    const createdRows = valid.filter(row => createdIds.has(ids.get(row.rowNumber)!));
+    await tx.unitLifecycleEvent.createMany({ data: createdRows.flatMap(row => [{ unitId: ids.get(row.rowNumber)!, eventType: "CREATED", accountId, source: `import:${batchId}` }, ...(row.orderId ? [{ unitId: ids.get(row.rowNumber)!, eventType: "ORDER_ASSOCIATED", accountId, source: `import:${batchId}`, orderNumber: row.orderId }] : []), ...(row.orderId && orderDates.get(row.orderId) ? [{ unitId: ids.get(row.rowNumber)!, eventType: "DELIVERED", accountId, source: `import:${batchId}`, orderNumber: row.orderId, detail: orderDates.get(row.orderId)!.toISOString().slice(0, 10) }] : [])]) });
+    await tx.unitSale.createMany({ data: createdRows.filter(row => row.orderId).map(row => ({ unitId: ids.get(row.rowNumber)!, purchaseOrderId: orderIds.get(row.orderId)!, confirmedDeliveredOn: orderDates.get(row.orderId) })) });
     const insertedRows = created.length;
     const skippedRows = preview.summary.total - insertedRows;
-    const history = await tx.unitImport.create({ data: { id: batchId, brandId, accountId, filename: options.filename.slice(0, 255), status: "COMPLETED", totalRows: preview.summary.total, insertedRows, skippedRows, failedRows: 0, summary: `${insertedRows} created; ${skippedRows} skipped.` } });
+    const history = await tx.unitImport.create({ data: { id: batchId, brandId, accountId, filename: options.filename.slice(0, 255), importType: "UNIT_REGISTRY", status: preview.summary.errors ? "COMPLETED_WITH_ERRORS" : "COMPLETED", totalRows: preview.summary.total, insertedRows, skippedRows, failedRows: preview.summary.errors, summary: `${insertedRows} created; ${skippedRows} skipped.` } });
     return { history, insertedRows, skippedRows, rows: preview.rows.map(row => row.status === "valid" && !createdIds.has(ids.get(row.rowNumber)!) ? { ...row, status: "existing" as const, reason: "Skipped because another import added this ID first." } : row) };
   }, { timeout: 120000 });
   return result;

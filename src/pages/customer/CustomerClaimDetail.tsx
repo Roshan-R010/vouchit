@@ -113,6 +113,8 @@ export function CustomerClaimDetail() {
 
   const { unit, customer } = claim.registration;
   const status = claim.status;
+  const resolution = claim.resolution;
+  const resolutionLabel = (value: string) => value.toLowerCase().replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase());
 
   // Timeline step active states
   const isSubmitted = true;
@@ -159,6 +161,16 @@ export function CustomerClaimDetail() {
 
       {notice && <div className="notice" style={{ margin: "0 30px 20px" }}>{notice}</div>}
 
+      {(status === "APPROVED" || status === "RESOLVED") && <section className="claim-info" style={{ marginBottom: 24 }} aria-label="Resolution progress">
+        <h3>{resolution ? `${resolutionLabel(resolution.type)} progress` : "Claim approved"}</h3>
+        <p>{resolution ? `${resolutionLabel(resolution.step)} · ${resolutionLabel(resolution.status)}` : "The brand has approved your claim and will share the next step here."}</p>
+        {resolution?.courier && <p>Courier: {resolution.courier}</p>}
+        {resolution?.trackingNumber && <p>Tracking: {resolution.trackingNumber}</p>}
+        {resolution?.type === "REFUND" && resolution.refundAmount && <p>Refund amount: {resolution.refundCurrency} {resolution.refundAmount}</p>}
+        {resolution?.replacementUnit?.serialNumber && <p>Replacement Unit ID: {resolution.replacementUnit.serialNumber}</p>}
+        {resolution?.events?.length > 0 && <ol style={{ paddingLeft: 20 }}>{resolution.events.map((event: any) => <li key={event.id} style={{ marginBottom: 8 }}><strong>{resolutionLabel(event.toStep)}</strong> · {formatDate(event.createdAt)}{event.customerMessage && <p>{event.customerMessage}</p>}</li>)}</ol>}
+      </section>}
+
       {/* Information Request from Brand */}
       {status === "INFO_REQUESTED" && (
         <div style={{ margin: "0 30px 24px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "10px", padding: "18px" }}>
@@ -189,7 +201,7 @@ export function CustomerClaimDetail() {
         </div>
       )}
 
-      {claim.addressRequest && (status === "APPROVED" || status === "RESOLVED") && <section className="claim-info" style={{ marginBottom: 24 }}><h3>{claim.addressRequest.receivedAt ? "Address shared with the brand" : "Address requested"}</h3><p style={{ fontSize: 15, lineHeight: 1.6 }}>Your {unit.brand.name} claim was approved for {claim.resolutionMethod === "REPLACEMENT" ? "replacement" : "repair"}. {claim.addressRequest.receivedAt ? "The brand can now see the address below." : "Please provide the address needed to arrange the next step."}</p>
+      {claim.addressRequest && (status === "APPROVED" || status === "RESOLVED") && <section className="claim-info" style={{ marginBottom: 24 }}><h3>{claim.addressRequest.receivedAt ? "Address shared with the brand" : "Address requested"}</h3><p style={{ fontSize: 15, lineHeight: 1.6 }}>Your {unit.brand.name} claim is being handled as a {resolution?.type === "REPLACEMENT" ? "replacement" : "repair"}. {claim.addressRequest.receivedAt ? "The brand can now see the address below." : "Please provide the address needed to arrange the next step."}</p>
         {claim.addressRequest.receivedAt && !editingAddress && <><address style={{ fontStyle: "normal", lineHeight: 1.7, marginBottom: 14 }}>{address.recipient}<br/>{address.line1}<br/>{address.line2 && <>{address.line2}<br/></>}{address.city}, {address.region} {address.postalCode}<br/>{address.country}{address.phone && <><br/>{address.phone}</>}</address>{status === "APPROVED" && <button type="button" className="action secondary" onClick={() => setEditingAddress(true)}>Edit address</button>}</>}
         {status === "APPROVED" && editingAddress && <form onSubmit={handleAddressSubmit} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 14 }}>{addressFields.map(field => <div className="field" key={field.key} style={{ margin: 0 }}><label htmlFor={`claim-address-${field.key}`}>{field.label}</label><input id={`claim-address-${field.key}`} type="text" autoComplete={field.autocomplete} value={address[field.key]} required={field.required} maxLength={field.key === "line1" || field.key === "line2" ? 200 : field.key === "recipient" ? 120 : field.key === "postalCode" || field.key === "phone" ? 30 : 100} onChange={event => setAddress(current => ({ ...current, [field.key]: event.target.value }))}/></div>)}<div style={{ gridColumn: "1 / -1", display: "flex", gap: 10 }}><button type="submit" className="action" disabled={submittingAddress}>{submittingAddress ? "Saving…" : "Share address with brand"}</button>{claim.addressRequest.receivedAt && <button type="button" className="action secondary" onClick={() => setEditingAddress(false)}>Cancel</button>}</div></form>}
       </section>}
