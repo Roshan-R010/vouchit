@@ -108,10 +108,11 @@ export function CustomerDashboard() {
                 <h2>{w.productName}</h2>
                 <p>{w.brandName} · Serial {w.serialNumber}</p>
                 {w.claim?.addressNeeded && <p style={{ color: "#945019", fontWeight: 700, fontSize: 14 }}>Address requested for your claim</p>}
+                {w.claim && <p style={{ fontSize: 14, fontWeight: 700 }}>{w.claim.status === "RESOLVED" ? "Claim resolved" : w.claim.resolution?.status === "IN_PROGRESS" ? `${w.claim.resolution.type.toLowerCase()} · ${w.claim.resolution.step.toLowerCase().replaceAll("_", " ")}` : w.claim.status === "APPROVED" ? "Claim approved · awaiting resolution" : `Claim ${w.claim.status.toLowerCase().replaceAll("_", " ")}`}</p>}
 
                 <div className="warranty-remaining">
                   <strong>{w.isActive ? w.daysRemaining : 0}</strong>
-                  <span>{w.isActive ? "days of warranty left" : "warranty expired"}</span>
+                  <span>{w.isActive ? "days of warranty left" : w.registrationActive === false ? "warranty ended" : "warranty expired"}</span>
                 </div>
 
                 <div className="progress">

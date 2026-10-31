@@ -9,6 +9,7 @@ export function CustomerRegister() {
   const navigate = useNavigate();
 
   const [serialNumber, setSerialNumber] = useState(searchParams.get("serialNumber") || "");
+  const [orderNumber, setOrderNumber] = useState(searchParams.get("orderNumber") || "");
   const [customerName, setCustomerName] = useState("");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -30,6 +31,7 @@ export function CustomerRegister() {
           brandSlug,
           productSlug,
           serialNumber: serialNumber.trim().toUpperCase(),
+          orderNumber: orderNumber.trim(),
           customerName: customerName.trim(),
           email: email.trim(),
         }),
@@ -75,6 +77,7 @@ export function CustomerRegister() {
               Located directly on the hardware body or retail gift box barcode.
             </small>
           </div>
+          <div className="field"><label>Order ID (required for resold units)</label><input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} maxLength={120}/></div>
 
           <div className="field">
             <label>Your Full Name *</label>

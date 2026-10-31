@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requireBrand, isUuid } from "@/lib/brand";
 import { dateOnly } from "@/lib/dates";
 import { saveBrandLogo, saveProductImage, removeNewProductImage } from "@/lib/product-images";
+import { changeUnitLifecycle } from "../../server/unit-lifecycle";
 
 export type BrandActionState = { error?: string; success?: string };
 class FormError extends Error {}
@@ -46,7 +47,10 @@ async function createUnit(tx: Prisma.TransactionClient, brandId: string, product
   let order = await tx.purchaseOrder.findUnique({ where: { brandId_orderNumber: { brandId, orderNumber: values.orderNumber } } });
   if (order && order.deliveredOn?.getTime() !== values.deliveredOn?.getTime()) throw new FormError("That order already has a different delivery date. Use its recorded date or a different order reference.");
   if (!order) order = await tx.purchaseOrder.create({ data: { brandId, orderNumber: values.orderNumber, deliveredOn: values.deliveredOn } });
-  return tx.productUnit.create({ data: { brandId, productModelId, purchaseOrderId: order.id, serialNumber: values.serialNumber } });
+  const unit = await tx.productUnit.create({ data: { brandId, productModelId, purchaseOrderId: order.id, serialNumber: values.serialNumber, status: values.deliveredOn ? "DELIVERED" : "PENDING" } });
+  await tx.unitSale.create({ data: { unitId: unit.id, purchaseOrderId: order.id, confirmedDeliveredOn: values.deliveredOn } });
+  await tx.unitLifecycleEvent.createMany({ data: [{ unitId: unit.id, eventType: "CREATED", source: "brand-action" }, { unitId: unit.id, eventType: "ORDER_ASSOCIATED", source: "brand-action", orderNumber: values.orderNumber }, ...(values.deliveredOn ? [{ unitId: unit.id, eventType: "DELIVERED", source: "brand-action", orderNumber: values.orderNumber, detail: values.deliveredOn.toISOString().slice(0, 10) }] : [])] });
+  return unit;
 }
 
 async function productImage(form: FormData, sessionId: string, productId: string, current: string | null) {
@@ -197,14 +201,9 @@ export async function updateUnitDeliveryAction(sessionId: string, productId: str
     deliveryForm.set("deliveredOn", String(form.get("deliveredOn") ?? ""));
     const deliveredOn = unitFields(deliveryForm)?.deliveredOn;
     if (!deliveredOn) throw new FormError("Enter the date this order was delivered.");
-    await db.$transaction(async (tx) => {
-      const unit = await tx.productUnit.findFirst({ where: { id: unitId, brandId: brand.id, productModelId: productId, purchaseOrder: { brandId: brand.id } }, include: { purchaseOrder: { include: { units: { select: { registration: { select: { id: true } } } } } } } });
-      if (!unit) throw new FormError("Unit not found.");
-      if (!unit.purchaseOrder || !unit.purchaseOrderId) throw new FormError("This unit has no order.");
-      if (unit.purchaseOrder.deliveredOn || unit.purchaseOrder.units.some((item) => item.registration)) throw new FormError("This order already has recorded warranty dates and cannot be changed here.");
-      const changed = await tx.purchaseOrder.updateMany({ where: { id: unit.purchaseOrderId, brandId: brand.id, deliveredOn: null }, data: { deliveredOn } });
-      if (changed.count !== 1) throw new FormError("This order was already updated. Refresh to see its delivery date.");
-    }, { timeout: 15000 });
+    const unit = await db.productUnit.findFirst({ where: { id: unitId, brandId: brand.id, productModelId: productId }, select: { id: true } });
+    if (!unit) throw new FormError("Unit not found.");
+    await changeUnitLifecycle(brand.id, unit.id, null, "brand-action", { type: "DELIVER", deliveredOn: deliveredOn.toISOString().slice(0, 10) });
   } catch (error) { return actionError(error); }
   refreshWorkspace(sessionId);
   return { success: "Delivery recorded for this order. Its units are now available for customer registration." };

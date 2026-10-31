@@ -13,9 +13,9 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import styles from "./claims-inbox.module.css";
 
 type ProductOption = { id: string; name: string; issueTags: string[] };
-type ClaimRow = { id: string; reference: string; status: string; issueTitle: string; submittedAt: string; customer: { name: string; email: string }; unit: { productModel: string; serialNumber: string; orderNumber: string | null } };
+type ClaimRow = { id: string; reference: string; status: string; requiresReturnReview?: boolean; issueTitle: string; submittedAt: string; customer: { name: string; email: string }; unit: { productModel: string; serialNumber: string; orderNumber: string | null } };
 const PAGE_SIZE = 10;
-const statusOptions = [["all", "All statuses"], ["open", "All open claims"], ["needs_review", "Needs review"], ["in_review", "In progress"], ["INFO_REQUESTED", "Needs info"], ["APPROVED", "Approved"], ["rejected", "Rejected"], ["RESOLVED", "Resolved"], ["resolved", "Approved & resolved"]];
+const statusOptions = [["all", "All statuses"], ["open", "Review inbox"], ["needs_review", "Needs review"], ["in_review", "In progress"], ["INFO_REQUESTED", "Needs info"], ["APPROVED", "Approved, unresolved"], ["rejected", "Rejected"], ["RESOLVED", "Resolved"]];
 
 export function BrandClaims() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -110,7 +110,7 @@ export function BrandClaims() {
         <thead><tr><th>Claim ID</th><th>Customer</th><th>Product</th><th>Issue</th><th>Status</th><th aria-sort={oldestFirst ? "ascending" : "descending"}><button type="button" onClick={() => setOldestFirst(value => !value)}>Date {oldestFirst ? <ArrowUp size={13}/> : <ArrowDown size={13}/>}</button></th></tr></thead>
         <tbody>{pageClaims.map(claim => <tr key={claim.id} className={selectedClaimId === claim.id ? styles.selected : undefined} onClick={() => setSelectedClaimId(claim.id)}>
           <td><button type="button" className={styles.claimLink} aria-label={`Open claim ${claim.reference}`} aria-expanded={selectedClaimId === claim.id} aria-controls={selectedClaimId === claim.id ? "claim-detail-panel" : undefined} onClick={() => setSelectedClaimId(claim.id)} title={claim.reference}>{shortClaimReference(claim.reference)}</button></td>
-          <td title={claim.customer.email}>{claim.customer.name}</td><td title={claim.unit.serialNumber}>{claim.unit.productModel}</td><td title={claim.issueTitle}>{claim.issueTitle}</td><td><ClaimInboxStatus status={claim.status}/></td><td className={styles.date}>{formatDate(claim.submittedAt)}</td>
+          <td title={claim.customer.email}>{claim.customer.name}</td><td title={claim.unit.serialNumber}>{claim.unit.productModel}</td><td title={claim.issueTitle}>{claim.issueTitle}</td><td><ClaimInboxStatus status={claim.status}/>{claim.requiresReturnReview && <span className="business-badge" title="The unit was returned while this claim was open">Return review needed</span>}</td><td className={styles.date}>{formatDate(claim.submittedAt)}</td>
         </tr>)}</tbody>
       </table></div>}
       {!loading && !error && <footer className={styles.pagination}><span>{claims.length ? `Showing ${(activePage - 1) * PAGE_SIZE + 1}–${Math.min(activePage * PAGE_SIZE, claims.length)} of ${claims.length} claims` : "0 claims"}</span><nav aria-label="Claims pages"><button disabled={activePage === 1} onClick={() => setPage(activePage - 1)} aria-label="Previous page"><ChevronLeft size={16}/></button>{pageNumbers.map((n, index) => <span key={n}>{index > 0 && n - pageNumbers[index - 1] > 1 && <span className={styles.ellipsis}>…</span>}<button aria-current={n === activePage ? "page" : undefined} onClick={() => setPage(n)} aria-label={`Page ${n}`}>{n}</button></span>)}<button disabled={activePage === pages} onClick={() => setPage(activePage + 1)} aria-label="Next page"><ChevronRight size={16}/></button></nav></footer>}

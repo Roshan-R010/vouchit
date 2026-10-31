@@ -9,6 +9,7 @@ const key = (date: Date) => date.toISOString().slice(0, 10);
 export function registrationAttentionWhere(filter: unknown, now = new Date()): Prisma.WarrantyRegistrationWhereInput {
   const today = dateOnly(now);
   if (filter === "expiring") return {
+    active: true,
     coverageStartsOn: { lte: today },
     coverageEndsOn: { gte: today, lte: new Date(today.getTime() + 30 * DAY) },
   };
@@ -49,7 +50,7 @@ export async function loadBrandDashboard(brandId: string, sessionId: string, per
       id: true, reference: true, status: true, submittedAt: true,
       registration: { select: { customer: { select: { name: true, email: true } }, unit: { select: { serialNumber: true, productModel: { select: { name: true, imageUrl: true } } } } } },
     } }),
-    db.claimEvent.count({ where: { toStatus: ClaimStatus.RESOLVED, createdAt: { gte: weekStart, lt: tomorrow }, claim: claimScope } }),
+    db.claimEvent.groupBy({ by: ["claimId"], where: { toStatus: ClaimStatus.RESOLVED, createdAt: { gte: weekStart, lt: tomorrow }, claim: { ...claimScope, status: ClaimStatus.RESOLVED } } }),
     db.$queryRaw<{ productId: string; tag: string; count: number }[]>(Prisma.sql`
       SELECT u."productModelId" AS "productId", issue.tag AS tag, COUNT(DISTINCT c.id)::integer AS count
       FROM "WarrantyClaim" c
@@ -68,8 +69,8 @@ export async function loadBrandDashboard(brandId: string, sessionId: string, per
     metrics: {
       totalRegistrations, productsCount: products.length, expiringSoonCount: upcomingExpirations.length, missingDetailsCount,
       needsReviewCount: count(ClaimStatus.SUBMITTED),
-      openClaimsCount: count(ClaimStatus.SUBMITTED) + count(ClaimStatus.UNDER_REVIEW) + count(ClaimStatus.INFO_REQUESTED),
-      resolvedThisWeek, periodRegistrations: registrations.length, periodClaims: submittedClaims.length,
+      openClaimsCount: count(ClaimStatus.SUBMITTED) + count(ClaimStatus.UNDER_REVIEW) + count(ClaimStatus.INFO_REQUESTED) + count(ClaimStatus.APPROVED),
+      resolvedThisWeek: resolvedThisWeek.length, periodRegistrations: registrations.length, periodClaims: submittedClaims.length,
     },
     chartData: dailySeries(registrations.map(row => row.registeredAt), firstDay, periodDays),
     claimSeries: dailySeries(submittedClaims.map(row => row.submittedAt), firstDay, periodDays),

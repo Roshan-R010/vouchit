@@ -29,6 +29,8 @@ enum ResolutionMethod {
 
 enum NotificationType {
   WARRANTY_REGISTERED
+  WARRANTY_ENDED
+  CLAIM_RESOLUTION_UPDATE
   CLAIM_SUBMITTED_CUSTOMER
   CLAIM_SUBMITTED_BRAND
 }
@@ -81,6 +83,7 @@ model Brand {
   orders        PurchaseOrder[]
   units         ProductUnit[]
   unitImports   UnitImport[]
+  importProfiles ImportProfile[]
   @@unique([demoSessionId, slug])
 }
 
@@ -124,6 +127,7 @@ model PurchaseOrder {
   brand       Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
   customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
   units       ProductUnit[]
+  unitSales   UnitSale[]
   @@unique([brandId, orderNumber])
 }
 
@@ -133,14 +137,70 @@ model ProductUnit {
   productModelId String               @db.Uuid
   purchaseOrderId String?             @db.Uuid
   serialNumber   String
+  status         UnitStatus           @default(PENDING)
+  activeRegistrationId String?         @unique @db.Uuid
   createdAt      DateTime             @default(now())
   brand          Brand                @relation(fields: [brandId], references: [id], onDelete: Cascade)
   productModel   ProductModel         @relation(fields: [productModelId], references: [id], onDelete: Cascade)
   purchaseOrder  PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
-  registration   WarrantyRegistration?
+  registration   WarrantyRegistration? @relation("ActiveRegistration", fields: [activeRegistrationId], references: [id], onDelete: SetNull)
+  registrations  WarrantyRegistration[] @relation("UnitRegistrations")
+  sales          UnitSale[]
+  events         UnitLifecycleEvent[]
+  replacementResolutions ClaimResolution[]
   @@unique([brandId, serialNumber])
   @@index([brandId, productModelId])
   @@index([brandId, purchaseOrderId])
+}
+
+enum UnitStatus {
+  PENDING
+  DELIVERED
+  RETURNED
+  FOR_SALE_AGAIN
+}
+
+model UnitSale {
+  id                  String       @id @default(uuid()) @db.Uuid
+  unitId              String       @db.Uuid
+  purchaseOrderId     String       @db.Uuid
+  isCurrent           Boolean      @default(true)
+  expectedDeliveryOn  DateTime?    @db.Date
+  confirmedDeliveredOn DateTime?   @db.Date
+  createdAt           DateTime     @default(now())
+  endedAt             DateTime?
+  unit                ProductUnit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  purchaseOrder       PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  registrations       WarrantyRegistration[]
+  @@index([unitId, createdAt])
+  @@index([purchaseOrderId])
+}
+
+model UnitLifecycleEvent {
+  id          String      @id @default(uuid()) @db.Uuid
+  unitId      String      @db.Uuid
+  eventType   String
+  accountId   String?     @db.Uuid
+  source      String
+  orderNumber String?
+  detail      String?
+  createdAt   DateTime    @default(now())
+  unit        ProductUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  @@index([unitId, createdAt])
+}
+
+model ImportProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  brandId     String   @db.Uuid
+  name        String
+  importType  String
+  config      Json
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastUsedAt  DateTime?
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  @@unique([brandId, name])
 }
 
 enum RegistrationVerificationMode {
@@ -155,8 +215,12 @@ model UnitImport {
   accountId    String?  @db.Uuid
   filename     String
   status       String
+  importType   String?
+  profileName  String?
   totalRows    Int
   insertedRows Int      @default(0)
+  updatedRows  Int      @default(0)
+  returnedRows Int      @default(0)
   skippedRows  Int      @default(0)
   failedRows   Int      @default(0)
   summary      String?
@@ -167,14 +231,21 @@ model UnitImport {
 
 model WarrantyRegistration {
   id               String         @id @default(uuid()) @db.Uuid
-  unitId           String         @unique @db.Uuid
+  unitId           String         @db.Uuid
+  saleId           String?        @db.Uuid
+  active           Boolean        @default(true)
+  deactivatedAt    DateTime?
+  deactivationReason String?
   customerId       String         @db.Uuid
   registeredAt     DateTime       @default(now())
   coverageStartsOn DateTime       @db.Date
   coverageEndsOn   DateTime       @db.Date
-  unit             ProductUnit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit             ProductUnit    @relation("UnitRegistrations", fields: [unitId], references: [id], onDelete: Cascade)
+  activeForUnit    ProductUnit?   @relation("ActiveRegistration")
+  sale             UnitSale?      @relation(fields: [saleId], references: [id], onDelete: SetNull)
   customer         Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   claim            WarrantyClaim?
+  @@index([unitId, registeredAt])
 }
 
 model WarrantyClaim {
@@ -185,6 +256,7 @@ model WarrantyClaim {
   description    String
   issueTags      String[]             @default([])
   status         ClaimStatus         @default(SUBMITTED)
+  requiresReturnReview Boolean       @default(false)
   submittedAt    DateTime            @default(now())
   resolutionMethod ResolutionMethod?
   registration   WarrantyRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
@@ -192,8 +264,65 @@ model WarrantyClaim {
   addressRequest ClaimAddress?
   messages       ClaimMessage[]
   events         ClaimEvent[]
+  resolution     ClaimResolution?
   @@index([status])
   @@index([submittedAt])
+}
+
+enum ResolutionType {
+  REPAIR
+  REPLACEMENT
+  REFUND
+}
+
+enum ResolutionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ClaimResolution {
+  id                String                @id @default(uuid()) @db.Uuid
+  claimId           String                @unique @db.Uuid
+  type              ResolutionType
+  status            ResolutionStatus      @default(IN_PROGRESS)
+  step              String
+  serviceReference  String?
+  trackingNumber    String?
+  courier           String?
+  refundAmount      Decimal?              @db.Decimal(12, 2)
+  refundCurrency    String?
+  replacementUnitId String?               @unique @db.Uuid
+  startedAt         DateTime              @default(now())
+  completedAt       DateTime?
+  updatedAt         DateTime              @updatedAt
+  createdById       String?               @db.Uuid
+  updatedById       String?               @db.Uuid
+  claim             WarrantyClaim         @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  replacementUnit   ProductUnit?          @relation(fields: [replacementUnitId], references: [id], onDelete: SetNull)
+  events            ClaimResolutionEvent[]
+  @@index([replacementUnitId])
+}
+
+model ClaimResolutionEvent {
+  id              String           @id @default(uuid()) @db.Uuid
+  resolutionId    String           @db.Uuid
+  requestId       String           @unique @db.Uuid
+  action          String
+  fromType        ResolutionType?
+  toType          ResolutionType
+  fromStatus      ResolutionStatus?
+  toStatus        ResolutionStatus
+  fromStep        String?
+  toStep          String
+  occurredOn      DateTime?        @db.Date
+  referenceNumber String?
+  internalNote    String?
+  customerMessage String?
+  actorAccountId  String?          @db.Uuid
+  createdAt       DateTime         @default(now())
+  resolution      ClaimResolution  @relation(fields: [resolutionId], references: [id], onDelete: Cascade)
+  @@index([resolutionId, createdAt])
 }
 
 model ClaimAttachment {
@@ -248,6 +377,7 @@ model DemoNotification {
   subject        String
   previewBody    String
   relatedId      String?          @db.Uuid
+  eventKey       String?          @unique
   createdAt      DateTime         @default(now())
   demoSession    DemoSession      @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
 }

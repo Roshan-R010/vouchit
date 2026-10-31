@@ -30,8 +30,8 @@ test("bulk import skips old rows on reupload and dual-ID registration checks the
     const { product } = await productResponse.json();
     expect((await page.request.post(`/api/demo/${workspace}/brand/products/${product.id}/units`, { data: { serialNumber: `OTHER-${key}`, orderNumber: `ORDER-B-${key}`, deliveredOn } })).status()).toBe(201);
     await page.goto(`/demo/${workspace}/brand/products/import`);
-    await expect(page.getByRole("heading", { name: "Import units" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Sample CSV" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Import Units" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Download Sample" })).toBeVisible();
     const first = `Unit ID,Product SKU,Order ID\n0000${key},SKU-${key},ORDER-A-${key}\nOLD-${key},SKU-${key},ORDER-A-${key}\n0000${key},SKU-${key},ORDER-A-${key}\n`;
     const makeOptions = (csv: string) => ({ filename: "units.csv", fileBase64: Buffer.from(csv).toString("base64"), hasHeader: true, mapping: { unit: 0, product: 1, order: 2 }, mode: "multiple" });
     const previewResponse = await page.request.post(`/api/demo/${workspace}/brand/unit-import/preview`, { data: makeOptions(first) });
