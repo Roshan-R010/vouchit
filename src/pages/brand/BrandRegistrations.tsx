@@ -74,7 +74,7 @@ export function BrandRegistrations() {
     if (search) query.set("search", search);
     if (filter === "missing_details") query.set("filter", filter);
     query.set("page", String(requestedPage));
-    apiFetch(`/api/demo/${sessionId}/brand/registrations?${query}`, { cache: "no-store" }).then(readApiResponse)
+    apiFetch(`/api/demo/${sessionId}/brand/registrations?${query}`, revision ? { cache: "no-store" } : undefined).then(readApiResponse)
       .then((response: LedgerResponse) => { if (active) setData(response); })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Could not load registrations."); })
       .finally(() => { if (active) setLoading(false); });

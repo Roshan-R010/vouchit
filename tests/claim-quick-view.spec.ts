@@ -95,7 +95,7 @@ test("claims layout groups filters, paginates, and opens a responsive panel", as
   await expect(panel).toHaveCount(0);
 });
 
-test("brand completes review, information request, approval and resolution inside panel", async ({ page }) => {
+test("brand completes review, information request and approval inside panel", async ({ page }) => {
   const { claims, actions } = await mockClaims(page);
   await page.goto(path);
   await page.getByRole("button", { name: "Open claim CLM-10432", exact: true }).click();
@@ -109,28 +109,17 @@ test("brand completes review, information request, approval and resolution insid
   claims[0].messages.push({ id: "reply", author: "CUSTOMER", body: "I used the original charger.", createdAt: new Date().toISOString() });
   await panel.getByRole("button", { name: "Refresh claim" }).click();
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
-  await panel.getByRole("combobox", { name: "Resolution method" }).click();
-  await page.keyboard.press("Escape");
-  await expect(panel).toBeVisible();
-  await panel.getByRole("combobox", { name: "Resolution method" }).click();
-  await page.getByRole("listbox").getByRole("option", { name: "Replacement", exact: true }).click();
   await panel.getByRole("button", { name: "Approve claim", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Mark as resolved", exact: true })).toBeDisabled();
+  await expect(panel.getByRole("link", { name: "Manage resolution" })).toHaveAttribute("href", `${path}/claim-1`);
   claims[0].addressRequest = { receivedAt: new Date().toISOString(), recipient: "Sarah Mitchell", line1: "123 Example Street", city: "Chennai", region: "Tamil Nadu", postalCode: "600001", country: "India", phone: "+910000000000" };
   await panel.getByRole("button", { name: "Refresh claim" }).click();
   await panel.locator("summary").filter({ hasText: "Address details" }).click();
   await expect(panel.getByText("123 Example Street", { exact: true })).toBeVisible();
-  await panel.getByRole("button", { name: "Mark as resolved", exact: true }).click();
-  await expect(panel.getByLabel("Resolution method")).toBeDisabled();
-  await panel.getByLabel("Repair or replacement outcome").fill("Replacement delivered to the customer.");
-  await panel.getByRole("button", { name: "Mark as resolved", exact: true }).last().click();
-  await expect(panel.getByText("This claim is resolved.")).toBeVisible();
-  expect(actions.map(action => action.decision)).toEqual(["review", "request_info", "approve", "resolve"]);
-  expect(actions.at(-1).resolutionMethod).toBe("REPLACEMENT");
+  expect(actions.map(action => action.decision)).toEqual(["review", "request_info", "approve"]);
   await expect(page).toHaveURL(path);
 });
 
-test("panel rejects with a reason and requests addresses for older approved claims", async ({ page }) => {
+test("panel rejects with a reason and links older approved claims to full detail", async ({ page }) => {
   const { actions } = await mockClaims(page);
   await page.goto(path);
   await page.getByRole("button", { name: "Open claim CLM-10431", exact: true }).click();
@@ -141,8 +130,6 @@ test("panel rejects with a reason and requests addresses for older approved clai
   await expect(panel.getByText("This claim is closed.", { exact: false })).toBeVisible();
   await panel.getByRole("button", { name: "Close claim details" }).click();
   await page.getByRole("button", { name: "Open claim CLM-10429", exact: true }).click();
-  await panel.getByRole("button", { name: "Request address", exact: true }).click();
-  await panel.getByRole("button", { name: "Request customer address", exact: true }).click();
-  await expect(panel.getByText("Awaiting customer", { exact: true })).toBeVisible();
-  expect(actions.map(action => action.decision)).toEqual(["reject", "request_address"]);
+  await expect(panel.getByRole("link", { name: "Manage resolution" })).toHaveAttribute("href", `${path}/claim-4`);
+  expect(actions.map(action => action.decision)).toEqual(["reject"]);
 });

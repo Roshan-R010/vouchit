@@ -1,33 +1,33 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
-import EntryPage from "./pages/EntryPage";
-import LoginPage from "./pages/LoginPage";
-import BrandSetup from "./pages/BrandSetup";
+const EntryPage = lazy(() => import("./pages/EntryPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const BrandSetup = lazy(() => import("./pages/BrandSetup"));
 
 // Brand Layout & Pages
-import BrandLayout from "./layouts/BrandLayout";
-import BrandDashboard from "./pages/brand/BrandDashboard";
-import BrandClaims from "./pages/brand/BrandClaims";
-import BrandClaimDetail from "./pages/brand/BrandClaimDetail";
-import BrandProducts from "./pages/brand/BrandProducts";
-import BrandProductDetail from "./pages/brand/BrandProductDetail";
-import BrandNewProduct from "./pages/brand/BrandNewProduct";
-import BrandUnitImport from "./pages/brand/BrandUnitImport";
-import BrandCustomers from "./pages/brand/BrandCustomers";
-import BrandRegistrations from "./pages/brand/BrandRegistrations";
-import BrandAnalytics from "./pages/brand/BrandAnalytics";
-import BrandSettings from "./pages/brand/BrandSettings";
+const BrandLayout = lazy(() => import("./layouts/BrandLayout"));
+const BrandDashboard = lazy(() => import("./pages/brand/BrandDashboard"));
+const BrandClaims = lazy(() => import("./pages/brand/BrandClaims"));
+const BrandClaimDetail = lazy(() => import("./pages/brand/BrandClaimDetail"));
+const BrandProducts = lazy(() => import("./pages/brand/BrandProducts"));
+const BrandProductDetail = lazy(() => import("./pages/brand/BrandProductDetail"));
+const BrandNewProduct = lazy(() => import("./pages/brand/BrandNewProduct"));
+const BrandUnitImport = lazy(() => import("./pages/brand/BrandUnitImport"));
+const BrandCustomers = lazy(() => import("./pages/brand/BrandCustomers"));
+const BrandRegistrations = lazy(() => import("./pages/brand/BrandRegistrations"));
+const BrandAnalytics = lazy(() => import("./pages/brand/BrandAnalytics"));
+const BrandSettings = lazy(() => import("./pages/brand/BrandSettings"));
 
 // Customer Layout & Pages
-import CustomerLayout from "./layouts/CustomerLayout";
-import CustomerDashboard from "./pages/customer/CustomerDashboard";
-import CustomerProductDetail from "./pages/customer/CustomerProductDetail";
-import CustomerNewClaim from "./pages/customer/CustomerNewClaim";
-import CustomerClaimDetail from "./pages/customer/CustomerClaimDetail";
-import CustomerRegister from "./pages/customer/CustomerRegisterPortal";
-import CustomerSupport from "./pages/customer/CustomerSupport";
-import CustomerSettings from "./pages/customer/CustomerSettings";
+const CustomerLayout = lazy(() => import("./layouts/CustomerLayout"));
+const CustomerDashboard = lazy(() => import("./pages/customer/CustomerDashboard"));
+const CustomerProductDetail = lazy(() => import("./pages/customer/CustomerProductDetail"));
+const CustomerNewClaim = lazy(() => import("./pages/customer/CustomerNewClaim"));
+const CustomerClaimDetail = lazy(() => import("./pages/customer/CustomerClaimDetail"));
+const CustomerRegister = lazy(() => import("./pages/customer/CustomerRegisterPortal"));
+const CustomerSupport = lazy(() => import("./pages/customer/CustomerSupport"));
+const CustomerSettings = lazy(() => import("./pages/customer/CustomerSettings"));
 
 function RequireRole({ role, children }: { role: "BRAND" | "CUSTOMER"; children: React.ReactNode }) {
   const { account, loading } = useAuth();
@@ -45,7 +45,7 @@ function RegistrationRequestsRedirect() {
 
 export function App() {
   return (
-    <Routes>
+    <Suspense fallback={<main className="auth-page"><p>Loading…</p></main>}><Routes>
       {/* Landing page */}
       <Route path="/" element={<EntryPage />} />
       <Route path="/login/:role" element={<LoginPage />} />
@@ -92,7 +92,7 @@ export function App() {
 
       {/* Default fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></Suspense>
   );
 }
 export default App;

@@ -27,8 +27,12 @@ export function BrandLayout() {
     localStorage.setItem("vouch-demo-session", sessionId);
     let active = true;
     const update = () => { void apiFetch(`/api/demo/${sessionId}/brand/settings`).then(readApiResponse).then(data => { if (active) { setBrand(data.brand); localStorage.setItem("vouch-demo-has-brand", "true"); } }).catch(() => {}); };
-    update(); window.addEventListener("vouch:data-changed", update);
-    return () => { active = false; window.removeEventListener("vouch:data-changed", update); };
+    const refreshSettings = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: string }>).detail?.url;
+      if (url === `/api/demo/${sessionId}/brand/settings`) update();
+    };
+    update(); window.addEventListener("vouch:data-changed", refreshSettings);
+    return () => { active = false; window.removeEventListener("vouch:data-changed", refreshSettings); };
   }, [sessionId]);
   if (!sessionId) return <p>Workspace not found.</p>;
   return <div className="business-shell brand-shell" data-nav-expanded={navExpanded} data-dashboard={!section} data-registrations-workspace={section === "registrations"} data-claim-detail={isClaimDetail} data-claims-workspace={section === "claims"} data-claims-inbox={section === "claims" && !isClaimDetail}>

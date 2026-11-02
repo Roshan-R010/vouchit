@@ -16,6 +16,22 @@ enum ClaimStatus {
   RESOLVED
 }
 
+enum ClaimTemplateCategory {
+  APPROVE
+  REJECT
+  REQUEST_INFO
+}
+
+enum ClaimCostCategory {
+  REPAIR_LABOR
+  REPLACEMENT_PRODUCT
+  PARTS_MATERIALS
+  RETURN_SHIPPING
+  OUTBOUND_SHIPPING
+  REFUND_PAID
+  OTHER
+}
+
 enum ActorRole {
   CUSTOMER
   BRAND
@@ -98,7 +114,21 @@ model Brand {
   unitImports   UnitImport[]
   importProfiles ImportProfile[]
   registrationRequests RegistrationRequest[]
+  claimTemplates ClaimTemplate[]
   @@unique([demoSessionId, slug])
+}
+
+model ClaimTemplate {
+  id        String @id @default(uuid()) @db.Uuid
+  brandId   String @db.Uuid
+  name      String
+  category  ClaimTemplateCategory
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  brand     Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  @@unique([brandId, name])
+  @@index([brandId, category])
 }
 
 model ProductModel {
@@ -315,8 +345,23 @@ model WarrantyClaim {
   messages       ClaimMessage[]
   events         ClaimEvent[]
   resolution     ClaimResolution?
+  costs          ClaimCost[]
   @@index([status])
   @@index([submittedAt])
+}
+
+model ClaimCost {
+  id          String @id @default(uuid()) @db.Uuid
+  claimId     String @db.Uuid
+  category    ClaimCostCategory
+  label       String?
+  amountPaise Int
+  note        String?
+  version     Int @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  claim       WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  @@index([claimId, createdAt])
 }
 
 enum ResolutionType {

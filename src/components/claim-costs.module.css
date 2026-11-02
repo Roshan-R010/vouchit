@@ -1,0 +1,43 @@
+.card { overflow: hidden; }
+.heading { margin: 0; }
+.toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 22px; border: 0; background: #fff; color: #23313e; text-align: left; cursor: pointer; }
+.toggle:hover { background: #fafbfc; }
+.toggle:focus-visible, .remove:focus-visible, .add:focus-visible { outline: 2px solid #315c80; outline-offset: -3px; }
+.toggle > span:first-child { display: grid; gap: 4px; }
+.toggle strong { font-size: 17px; }
+.toggle small { font-size: 13px; font-weight: 400; color: #62717e; }
+.headerRight { display: inline-flex; align-items: center; gap: 12px; white-space: nowrap; }
+.headerRight em { font-size: 12px; font-weight: 600; color: #936b32; font-style: normal; }
+.headerRight strong { font-size: 15px; }
+.chevron { flex-shrink: 0; transition: transform .18s ease; }
+.chevronOpen { composes: chevron; transform: rotate(180deg); }
+.body { border-top: 1px solid #e5eaf0; padding: 18px 22px 22px; }
+.columnHeads, .row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(130px, 1fr) 36px; gap: 10px; align-items: center; }
+.columnHeads { color: #62717e; font-size: 13px; font-weight: 600; padding: 0 0 8px; }
+.rows { display: grid; gap: 10px; }
+.row input { box-sizing: border-box; width: 100%; height: 42px; border: 1px solid #cbd5df; border-radius: 7px; padding: 0 12px; background: #fff; color: #23313e; font: inherit; }
+.row input:focus-visible { outline: 2px solid #315c80; outline-offset: 1px; }
+.expenseField, .amountField { min-width: 0; }
+.remove { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 7px; background: transparent; color: #667787; cursor: pointer; }
+.remove:hover { color: #a14d46; background: #faece9; }
+.legacyNote { grid-column: 1 / -1; color: #667787; font-size: 12px; }
+.add { display: inline-flex; align-items: center; gap: 5px; margin-top: 15px; padding: 8px 0; background: transparent; border: 0; color: #315c80; font: inherit; font-weight: 600; cursor: pointer; }
+.empty { margin: 0 0 6px; color: #62717e; font-size: 14px; }
+.total { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #e5eaf0; margin-top: 16px; padding-top: 16px; font-size: 15px; }
+.total small { display: inline-block; margin-left: 7px; color: #62717e; font-size: 12px; font-weight: 400; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.error { color: #a14d46; margin: 12px 0 0; }
+.notice { color: #386c43; margin: 12px 0 0; }
+.mobileLabel, .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 600px) {
+  .toggle { padding: 16px; align-items: flex-start; }
+  .headerRight { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .headerRight em { width: 100%; text-align: right; }
+  .body { padding: 16px; }
+  .columnHeads { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr) 36px; gap: 8px; }
+  .expenseField { grid-column: 1; }
+  .amountField { grid-column: 1; }
+  .remove { grid-column: 2; grid-row: 1 / span 2; }
+  .mobileLabel { position: static; width: auto; height: auto; margin: 0 0 4px; overflow: visible; clip: auto; display: block; font-size: 12px; color: #62717e; }
+}

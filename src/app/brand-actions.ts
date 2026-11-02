@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireBrand, isUuid } from "@/lib/brand";
+import { requireBrand, invalidateBrand, isUuid } from "@/lib/brand";
 import { dateOnly } from "@/lib/dates";
 import { saveBrandLogo, saveProductImage, removeNewProductImage } from "@/lib/product-images";
 import { changeUnitLifecycle } from "../../server/unit-lifecycle";
@@ -108,6 +108,7 @@ export async function createBrandAction(sessionId: string, _state: BrandActionSt
     const logo = await brandLogo(form, sessionId, brandId, null);
     if (logo.uploaded) uploadedUrl = logo.logoUrl;
     await db.brand.create({ data: { id: brandId, demoSessionId: sessionId, name, slug: brandSlug(name, brandId), supportEmail, logoUrl: logo.logoUrl } });
+    invalidateBrand(sessionId);
   } catch (error) {
     if (uploadedUrl) await removeNewProductImage(uploadedUrl);
     return actionError(error);
@@ -182,6 +183,7 @@ export async function updateBrandAction(sessionId: string, _state: BrandActionSt
     const logo = await brandLogo(form, sessionId, brand.id, brand.logoUrl);
     if (logo.uploaded) uploadedUrl = logo.logoUrl;
     await db.brand.update({ where: { id: brand.id }, data: { name, supportEmail, logoUrl: logo.logoUrl } });
+    invalidateBrand(sessionId);
     if (brand.logoUrl && brand.logoUrl !== logo.logoUrl) await removeNewProductImage(brand.logoUrl);
   } catch (error) {
     if (uploadedUrl) await removeNewProductImage(uploadedUrl);

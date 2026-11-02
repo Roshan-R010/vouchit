@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { isUuid, requireBrand } from "@/lib/brand";
+import { isUuid, requireBrand, invalidateBrand } from "@/lib/brand";
 import { removeWorkspaceImage, saveWorkspaceImage } from "@/lib/workspace-images";
 
 export type BrandProfileState = { error?: string; success?: string };
@@ -35,6 +35,7 @@ export async function createBrandAction(sessionId: string, _state: BrandProfileS
       const slug = fields.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) || "brand";
       return tx.brand.create({ data: { id, demoSessionId: sessionId, ...fields, slug: `${slug}-${id.slice(0, 8)}`, logoUrl: uploaded } });
     }, { timeout: 15000 });
+    invalidateBrand(sessionId);
     if (brand.id !== id && uploaded) await removeWorkspaceImage(uploaded);
   } catch (error) {
     if (uploaded) await removeWorkspaceImage(uploaded);
@@ -53,6 +54,7 @@ export async function saveBrandProfileAction(sessionId: string, _state: BrandPro
     const logo = form.get("logo");
     if (logo instanceof File && logo.size) logoUrl = uploaded = await saveWorkspaceImage(sessionId, "logos", brand.id, logo);
     await db.brand.update({ where: { id: brand.id }, data: { ...fields, logoUrl } });
+    invalidateBrand(sessionId);
     if (brand.logoUrl && brand.logoUrl !== logoUrl) await removeWorkspaceImage(brand.logoUrl);
   } catch (error) {
     if (uploaded) await removeWorkspaceImage(uploaded);

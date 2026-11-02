@@ -52,7 +52,7 @@ export function BrandClaims() {
     if (currentProduct) query.set("product", currentProduct);
     if (currentSearch) query.set("search", currentSearch);
     selectedTags.forEach(tag => query.append("tag", tag));
-    apiFetch(`/api/demo/${sessionId}/brand/claims?${query}`, { cache: "no-store" }).then(readApiResponse)
+    apiFetch(`/api/demo/${sessionId}/brand/claims${query.size ? `?${query}` : ""}`, revision ? { cache: "no-store" } : undefined).then(readApiResponse)
       .then(data => { if (active) { setClaims(data.claims || []); setProducts(data.products || []); setCounts(data.counts || {}); } })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Could not load claims."); })
       .finally(() => { if (active) setLoading(false); });

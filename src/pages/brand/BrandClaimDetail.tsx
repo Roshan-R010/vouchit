@@ -3,13 +3,14 @@ import { ClaimStatusBadge } from "@/components/claim-status-badge";
 import { ClaimEvidence } from "@/components/claim-evidence";
 import { ProductPhoto } from "@/components/product-photo";
 import { apiFetch } from "@/lib/api-fetch";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldAlert, CheckCircle, HelpCircle, XCircle, ArrowRight, User, Package, Calendar, ChevronDown } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 import { shortClaimReference } from "@/lib/claim-reference";
 import { ClaimResolutionPanel } from "@/components/claim-resolution-panel";
-import historyStyles from "./claim-history.module.css";
+import { ClaimTemplatePicker, type TemplateCategory } from "@/components/claim-template-picker";
+import { ClaimCosts, useClaimCosts } from "@/components/claim-costs";
 import styles from "./claim-detail.module.css";
 
 const claimStatusLabel: Record<string, string> = {
@@ -29,6 +30,12 @@ function claimBadgeStyle(status: string): React.CSSProperties {
   return { background: "#f0f2ed", color: "#737d69" };
 }
 
+type DetailTab = "details" | "resolution" | "costs" | "activity";
+const detailTabs: { id: DetailTab; label: string }[] = [
+  { id: "details", label: "Claim Details" }, { id: "resolution", label: "Resolution" },
+  { id: "costs", label: "Resolution Costs" }, { id: "activity", label: "Activity" },
+];
+
 export function BrandClaimDetail() {
   const { sessionId, claimId } = useParams<{ sessionId: string; claimId: string }>();
   const [searchParams] = useSearchParams();
@@ -37,6 +44,9 @@ export function BrandClaimDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
+  const costEditor = useClaimCosts(sessionId || "", claimId || "");
+  const decisionInitializedFor = useRef<string | null>(null);
 
   // Form states for actions
   const [decision, setDecision] = useState<string>("approve");
@@ -51,9 +61,12 @@ export function BrandClaimDetail() {
       .then((data) => {
         if (data.claim) {
           setClaim(data.claim);
-          // Set default decision based on status
-          if (data.claim.status === "SUBMITTED") setDecision("review");
-          else if (data.claim.status === "UNDER_REVIEW") setDecision(["approve", "request_info", "reject"].includes(searchParams.get("decision") || "") ? searchParams.get("decision")! : "approve");
+          if (decisionInitializedFor.current !== claimId) {
+            setDecision(data.claim.status === "SUBMITTED" ? "review" : data.claim.status === "UNDER_REVIEW" && ["approve", "request_info", "reject"].includes(searchParams.get("decision") || "") ? searchParams.get("decision")! : "approve");
+            decisionInitializedFor.current = claimId!;
+          } else if (data.claim.status === "UNDER_REVIEW") {
+            setDecision(current => current === "review" ? "approve" : current);
+          }
         }
         setLoading(false);
       })
@@ -159,7 +172,17 @@ export function BrandClaimDetail() {
       {error && <div className="business-notice error">{error}</div>}
       {claim.requiresReturnReview && <div className="business-notice">This unit was returned while the claim was open. Review the claim and its warranty history before taking further action.</div>}
 
-      <div className={styles.columns}>
+      <div className={styles.tabBar} role="tablist" aria-label="Claim sections" onKeyDown={event => {
+        const current = detailTabs.findIndex(tab => tab.id === activeTab);
+        const next = event.key === "ArrowRight" ? (current + 1) % detailTabs.length : event.key === "ArrowLeft" ? (current + detailTabs.length - 1) % detailTabs.length : event.key === "Home" ? 0 : event.key === "End" ? detailTabs.length - 1 : -1;
+        if (next < 0) return;
+        event.preventDefault(); setActiveTab(detailTabs[next].id);
+        document.getElementById(`claim-tab-${detailTabs[next].id}`)?.focus();
+      }}>
+        {detailTabs.map(tab => <button key={tab.id} id={`claim-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`claim-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} className={styles.tab} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
+      </div>
+
+      {activeTab === "details" && <section id="claim-panel-details" role="tabpanel" aria-labelledby="claim-tab-details"><div className={styles.columns}>
         {/* Left Column: Details, Unit, Events */}
         <div className={styles.column}>
           {/* Issue Statement */}
@@ -184,46 +207,12 @@ export function BrandClaimDetail() {
               <dl className={styles.productFacts}>
                 <div><dt>Model</dt><dd><strong>{unit.productModel.name}</strong><span>SKU: {unit.productModel.sku || "N/A"}</span></dd></div>
                 <div><dt>Stamped unit ID</dt><dd>{unit.serialNumber}</dd></div>
-                <div><dt>Purchase order</dt><dd>{unit.purchaseOrder.orderNumber}<span>Delivered: {unit.purchaseOrder.deliveredOn ? formatDate(unit.purchaseOrder.deliveredOn) : "N/A"}</span></dd></div>
+                <div><dt>Purchase order</dt><dd>{unit.purchaseOrder?.orderNumber || "N/A"}<span>Delivered: {unit.purchaseOrder?.deliveredOn ? formatDate(unit.purchaseOrder.deliveredOn) : "N/A"}</span></dd></div>
                 <div><dt>Warranty</dt><dd>{unit.productModel.warrantyMonths} months<span>Through: {formatDate(claim.registration.coverageEndsOn)}</span></dd></div>
               </dl>
             </div>
           </div>
 
-          {/* Activity / Event Timeline */}
-          <details key={claim.id} className={`business-panel ${historyStyles.panel}`}>
-            <summary className={`business-panel-header ${historyStyles.toggle}`}>
-              <h2>History & Transition Events</h2>
-              <ChevronDown size={20} aria-hidden="true" />
-            </summary>
-            <div className={styles.panelBody}>
-              <div style={{ display: "grid", gap: "16px" }}>
-                {claim.events?.map((ev: any, idx: number) => (
-                  <div key={ev.id || idx} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                    <div
-                      style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        background: "#536148",
-                        marginTop: "6px",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
-                        <strong>{ev.actor === "CUSTOMER" ? customer.name : "Brand Specialist"}</strong>
-                        <span style={{ color: "#9aa196" }}>{formatDate(ev.createdAt)}</span>
-                      </div>
-                      <div style={{ fontSize: "14px", color: "#4f574c", marginTop: "3px" }}>
-                        {ev.note || `Transitioned to ${ev.toStatus}`}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </details>
         </div>
 
         {/* Right Column: Actions */}
@@ -298,6 +287,7 @@ export function BrandClaimDetail() {
                       </div>
 
                       <div className="business-field">
+                        <ClaimTemplatePicker sessionId={sessionId!} category={decision.toUpperCase() as TemplateCategory} value={note} onInsert={setNote} disabled={submitting}/>
                         <label>
                           {decision === "request_info"
                             ? "Question for Customer *"
@@ -316,6 +306,7 @@ export function BrandClaimDetail() {
                           value={note}
                           onChange={(e) => setNote(e.target.value)}
                           rows={4}
+                          maxLength={2000}
                           required={decision === "request_info" || decision === "reject"}
                         />
                       </div>
@@ -345,24 +336,40 @@ export function BrandClaimDetail() {
             </div>
           </div>
 
-          <ClaimResolutionPanel key={claim.resolution?.id ?? claim.id} sessionId={sessionId!} claim={claim} onChanged={loadClaim}/>
-
           {/* Customer Summary Card */}
           <div className="business-panel">
             <div className="business-panel-header">
               <h2>Customer details</h2>
-              {(status === "APPROVED" || status === "RESOLVED") && <span className={`business-badge ${claim.addressRequest?.receivedAt ? "success" : ""}`}>{claim.addressRequest?.receivedAt ? "Address received" : claim.addressRequest ? "Address still not received" : "Address not requested"}</span>}
             </div>
             <div className={styles.panelBody}>
               <dl className={styles.contact}><div><dt>Name</dt><dd>{customer.name}</dd></div><div><dt>Email</dt><dd>{customer.email}</dd></div></dl>
-              {(status === "APPROVED" || status === "RESOLVED") && <section className={styles.address} aria-label="Customer address">
-                <h3>Delivery / collection address</h3>
-                {claim.addressRequest?.receivedAt ? <address><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address> : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p> : <><p>This claim has no address request.</p>{status === "APPROVED" && ["REPAIR", "REPLACEMENT"].includes(claim.resolution?.type) && claim.resolution?.status === "IN_PROGRESS" && <button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button>}</>}
-              </section>}
             </div>
           </div>
         </div>
-      </div>
+      </div></section>}
+
+      {activeTab === "resolution" && <section id="claim-panel-resolution" role="tabpanel" aria-labelledby="claim-tab-resolution" className={styles.singlePanel}>
+        {status === "APPROVED" || status === "RESOLVED" ? <>
+          <ClaimResolutionPanel key={claim.resolution?.id ?? claim.id} sessionId={sessionId!} claim={claim} onChanged={loadClaim}/>
+          <div className="business-panel">
+            <div className="business-panel-header"><h2>Delivery / collection address</h2><span className={`business-badge ${claim.addressRequest?.receivedAt ? "success" : ""}`}>{claim.addressRequest?.receivedAt ? "Address received" : claim.addressRequest ? "Address still not received" : "Address not requested"}</span></div>
+            <div className={styles.panelBody}>
+              {claim.addressRequest?.receivedAt ? <address className={styles.deliveryAddress}><strong>{claim.addressRequest.recipient}</strong><br/>{claim.addressRequest.line1}<br/>{claim.addressRequest.line2 && <>{claim.addressRequest.line2}<br/></>}{claim.addressRequest.city}, {claim.addressRequest.region} {claim.addressRequest.postalCode}<br/>{claim.addressRequest.country}{claim.addressRequest.phone && <><br/>Phone: {claim.addressRequest.phone}</>}</address>
+                : claim.addressRequest ? <p>The customer has been asked for an address. It will appear here when submitted.</p>
+                : <><p>This claim has no address request.</p>{status === "APPROVED" && ["REPAIR", "REPLACEMENT"].includes(claim.resolution?.type) && claim.resolution?.status === "IN_PROGRESS" && <button type="button" className="business-button primary" disabled={requestingAddress} onClick={requestAddress}>{requestingAddress ? "Requesting…" : "Request customer address"}</button>}</>}
+            </div>
+          </div>
+        </> : <div className="business-panel"><div className={styles.panelBody}>Resolution tracking is available after a claim is approved.</div></div>}
+      </section>}
+
+      {activeTab === "costs" && <section id="claim-panel-costs" role="tabpanel" aria-labelledby="claim-tab-costs" className={styles.singlePanel}><ClaimCosts editor={costEditor}/></section>}
+
+      {activeTab === "activity" && <section id="claim-panel-activity" role="tabpanel" aria-labelledby="claim-tab-activity" className={styles.singlePanel}>
+        <div className="business-panel"><div className="business-panel-header"><h2>History & Transition Events</h2></div><div className={styles.panelBody}><div className={styles.eventList}>
+          {claim.events?.length ? claim.events.map((ev: any, idx: number) => <div key={ev.id || idx} className={styles.event}><span className={styles.eventDot}/><div><div className={styles.eventMeta}><strong>{ev.actor === "CUSTOMER" ? customer.name : "Brand Specialist"}</strong><span>{formatDate(ev.createdAt)}</span></div><p>{ev.note || `Transitioned to ${ev.toStatus}`}</p></div></div>) : <p>No activity recorded yet.</p>}
+        </div></div></div>
+        {!!claim.messages?.length && <div className="business-panel"><div className="business-panel-header"><h2>Conversation</h2></div><div className={styles.panelBody}><div className={styles.eventList}>{claim.messages.map((message: any) => <div key={message.id} className={styles.message}><div className={styles.eventMeta}><strong>{message.author === "CUSTOMER" ? customer.name : "Brand team"}</strong><span>{formatDate(message.createdAt)}</span></div><p>{message.body}</p></div>)}</div></div></div>}
+      </section>}
     </div>
   );
 }

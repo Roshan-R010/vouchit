@@ -32,13 +32,19 @@ export function BrandNav({ sessionId, brandName, logoUrl, expanded, onToggle }: 
     { title: "Registrations", href: `${base}/registrations`, icon: ClipboardList },
     { title: "Analytics", href: `${base}/analytics`, icon: BarChart2 },
   ];
+  const prefetchUrl = (title: string, href: string) => {
+    const endpoint = `/api${href}`;
+    if (title === "Dashboard" || title === "Analytics") return `${endpoint}?days=30`;
+    if (title === "Registrations") return `${endpoint}?page=1`;
+    return endpoint;
+  };
   return <aside className="brand-rail-sidebar" aria-label="Brand workspace">
     <div className="brand-rail-header"><Link to={base} className="brand-rail-mark" aria-label="Vouch dashboard" aria-hidden={isExpanded} tabIndex={isExpanded ? -1 : undefined}><VouchLogo compact/></Link><div className="brand-rail-header-panel" aria-hidden={!isExpanded}><Link to={base} className="brand-rail-wordmark" tabIndex={isExpanded ? undefined : -1}><VouchLogo /></Link><button type="button" className="brand-rail-toggle" onClick={toggle} aria-label="Collapse sidebar" title="Collapse sidebar" tabIndex={isExpanded ? undefined : -1}><ChevronsLeft size={17}/></button></div></div>
     <div className="brand-rail-workspace"><div className="brand-rail-workspace-spacer"/><div className="brand-rail-workspace-panel"><span className="brand-rail-brand-avatar">{logoUrl ? <img src={logoUrl} alt=""/> : brandName.slice(0, 2)}</span><span className="brand-rail-brand-text"><strong>{brandName}</strong><small>Brand workspace</small></span></div></div>
     {!isExpanded && <button type="button" className="brand-rail-expand" onClick={toggle} aria-label="Expand sidebar" title="Expand sidebar"><ChevronsRight size={16}/></button>}
     <nav className="brand-rail-nav" aria-label="Business navigation">{links.map(({ title, href, icon: Icon }) => {
       const active = title === "Dashboard" ? pathname === href : pathname.startsWith(href);
-      return <Link key={href} to={href} data-section={title.toLowerCase()} onPointerEnter={() => prefetchApi(`/api${href}`)} onFocus={() => prefetchApi(`/api${href}`)} className={`brand-rail-link ${active ? "active" : ""}`} aria-current={active ? "page" : undefined} title={!isExpanded ? title : undefined}>
+      return <Link key={href} to={href} data-section={title.toLowerCase()} onPointerEnter={() => prefetchApi(prefetchUrl(title, href))} onFocus={() => prefetchApi(prefetchUrl(title, href))} className={`brand-rail-link ${active ? "active" : ""}`} aria-current={active ? "page" : undefined} title={!isExpanded ? title : undefined}>
         <span className="brand-rail-icon">{active && <motion.span className="brand-rail-icon-active" layoutId="brand-rail-icon-highlight" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 36 }}/>}<Icon size={18} strokeWidth={1.9}/></span><span className="brand-rail-link-label">{title}</span>
       </Link>;
     })}</nav>

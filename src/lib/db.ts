@@ -10,7 +10,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const pooledUrl = (() => {
   if (!databaseUrl) return undefined;
   const url = new URL(databaseUrl);
-  if (!url.searchParams.has("connection_limit")) url.searchParams.set("connection_limit", "3");
+  if (!url.searchParams.has("connection_limit")) url.searchParams.set("connection_limit", "4");
   return url.toString();
 })();
 export const db = globalForPrisma.prisma ?? new PrismaClient(pooledUrl ? { datasources: { db: { url: pooledUrl } } } : undefined);

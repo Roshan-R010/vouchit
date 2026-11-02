@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { readApiResponse } from "@/lib/api-response";
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { ClaimTemplateManager } from "@/components/claim-template-manager";
 
 export function BrandSettings() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -135,6 +136,7 @@ export function BrandSettings() {
           </>}
         </form>
       </div>
+      {sessionId && <ClaimTemplateManager sessionId={sessionId}/>}
     </div>
   );
 }

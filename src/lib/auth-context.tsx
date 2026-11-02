@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "./api-fetch";
+import { readApiResponse } from "./api-response";
 
 export type Account = { id: string; role: "BRAND" | "CUSTOMER"; displayName: string; demoSessionId: string | null };
 type AuthValue = { account: Account | null; loading: boolean; refresh: () => Promise<void>; signOut: () => Promise<void> };
@@ -10,7 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   async function refresh() {
     const response = await apiFetch("/api/auth/me", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readApiResponse(response);
     setAccount(data.account || null);
     setLoading(false);
   }

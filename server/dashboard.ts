@@ -84,3 +84,22 @@ export async function loadBrandDashboard(brandId: string, sessionId: string, per
     })),
   };
 }
+
+const dashboardCache = new Map<string, { expiresAt: number; value: Promise<Awaited<ReturnType<typeof loadBrandDashboard>>> }>();
+
+export function invalidateDashboardCache() {
+  dashboardCache.clear();
+}
+
+export function cachedBrandDashboard(brandId: string, sessionId: string, periodDays: 7 | 30 | 90) {
+  const key = `${brandId}:${sessionId}:${periodDays}`;
+  const cached = dashboardCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (dashboardCache.size > 200) dashboardCache.clear();
+  const value = loadBrandDashboard(brandId, sessionId, periodDays).catch(error => {
+    if (dashboardCache.get(key)?.value === value) dashboardCache.delete(key);
+    throw error;
+  });
+  dashboardCache.set(key, { expiresAt: Date.now() + 15_000, value });
+  return value;
+}

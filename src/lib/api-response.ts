@@ -3,7 +3,9 @@ export async function readApiResponse(response: Response) {
   if (!response.headers.get("content-type")?.includes("application/json")) {
     throw new Error("The API server is unavailable. Restart the app with npm run dev and try again.");
   }
-  const data = await response.json();
+  const data = await response.json().catch(() => {
+    throw new Error("The API server returned an empty or invalid response. Restart the app with npm run dev and try again.");
+  });
   if (!response.ok) throw new Error(data.error || "The request could not be completed.");
   return data;
 }

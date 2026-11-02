@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api-fetch";
+import { ClaimTemplatePicker } from "./claim-template-picker";
 import { readApiResponse } from "@/lib/api-response";
 import { formatDate } from "@/lib/dates";
 import { shortClaimReference } from "@/lib/claim-reference";
@@ -115,6 +116,7 @@ function ClaimPanelContent({ sessionId, claimId, onClose, onUpdated, closeRef }:
 
             {action && <form className={styles.actionForm} onSubmit={submit}>
               <h3>{actionLabels[action]}</h3>
+              <ClaimTemplatePicker sessionId={sessionId} category={action.toUpperCase() as "APPROVE" | "REJECT" | "REQUEST_INFO"} value={note} onInsert={setNote} disabled={submitting}/>
               <label>{action === "request_info" ? "What information do you need?" : action === "reject" ? "Reason for rejection" : "Note to record (optional)"}<textarea autoFocus rows={3} maxLength={2000} required={["request_info", "reject"].includes(action)} disabled={submitting} value={note} onChange={event => setNote(event.target.value)}/></label>
               <div><button type="button" onClick={() => setAction(null)} disabled={submitting}>Cancel</button><button className={action === "reject" ? styles.danger : styles.primary} disabled={disabled} type="submit">{submitting ? "Saving…" : actionLabels[action]}</button></div>
             </form>}

@@ -1,5 +1,5 @@
 import { loadAnalytics } from "./analytics";
-import { loadBrandDashboard, registrationAttentionWhere } from "./dashboard";
+import { cachedBrandDashboard, invalidateDashboardCache, registrationAttentionWhere } from "./dashboard";
 import { IssueTagValidationError, normalizeIssueTags, selectProductIssueTags } from "../src/lib/issue-tags";
 import express from "express";
 import cors from "cors";
@@ -10,7 +10,7 @@ import { File } from "node:buffer";
 import { AccountRole, ActorRole, ClaimStatus, NotificationType, Prisma, RegistrationVerificationMode, ResolutionMethod } from "@prisma/client";
 import { currentAccount, endSession, hashPassword, startSession, verifyPassword } from "./auth";
 import { db } from "../src/lib/db";
-import { requireBrand, isUuid } from "../src/lib/brand";
+import { requireBrand, invalidateBrand, isUuid } from "../src/lib/brand";
 import { createDemoSession, resetDemoSession, sessionCustomer } from "../src/lib/demo";
 import { addCalendarMonths, dateOnly, daysRemaining, formatDate, isCoverageActive } from "../src/lib/dates";
 import { readProductImage, removeNewProductImage, saveBrandLogo, saveProductImage } from "../src/lib/product-images";
@@ -21,6 +21,7 @@ import { changeUnitLifecycle } from "./unit-lifecycle";
 import { commitBatch, planBatch } from "./advanced-import";
 import { validProfileConfig } from "./import-profile";
 import { updateClaimResolution } from "./claim-resolution";
+import { claimAdminRouter } from "./claim-admin";
 import { isLateRegistration, parseRegistrationPolicy, registrationDeadline } from "./registration-policy";
 
 const defaultRegistrationPolicy = { registrationWindowDays: null, lateRegistrationAction: "REJECT" as const };
@@ -174,6 +175,15 @@ app.use("/api/demo/:sessionId", async (req, res, next) => {
   next();
 });
 
+app.use("/api/demo/:sessionId", (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+    res.once("finish", () => { if (res.statusCode >= 200 && res.statusCode < 300) invalidateDashboardCache(); });
+  }
+  next();
+});
+
+app.use("/api/demo/:sessionId/brand", claimAdminRouter);
+
 // Helper: safe session ID validation
 function checkSessionId(req: express.Request, res: express.Response): string | null {
   const sessionId = req.params.sessionId || req.body?.sessionId || req.query?.sessionId;
@@ -239,6 +249,7 @@ app.post("/api/demo/:sessionId/brand/setup", async (req, res) => {
     const logo = imageFromDataUrl(req.body?.logoDataUrl, "brand logo");
     if (logo) uploadedLogo = await saveBrandLogo(sessionId, brandId, logo);
     const brand = await db.brand.create({ data: { id: brandId, demoSessionId: sessionId, name, slug: makeSlug(name, brandId), supportEmail, logoUrl: uploadedLogo } });
+    invalidateBrand(sessionId);
     res.status(201).json({ brand });
   } catch (error: any) {
     if (uploadedLogo) await removeNewProductImage(uploadedLogo);
@@ -252,6 +263,7 @@ app.post("/api/demo/:sessionId/reset", async (req, res) => {
   if (!sessionId) return;
   try {
     const newSessionId = await resetDemoSession(sessionId);
+    invalidateBrand(sessionId);
     res.json({ success: true, sessionId: newSessionId });
   } catch (error) {
     console.error("Error resetting demo session:", error);
@@ -287,7 +299,7 @@ app.get("/api/demo/:sessionId/brand", async (req, res) => {
   try {
     const brand = await requireBrand(sessionId);
     const periodDays = req.query.days === "7" ? 7 : req.query.days === "90" ? 90 : 30;
-    res.json({ brand, ...await loadBrandDashboard(brand.id, sessionId, periodDays) });
+    res.json({ brand, ...await cachedBrandDashboard(brand.id, sessionId, periodDays) });
   } catch (error) {
     console.error("Brand dashboard error:", error);
     res.status(500).json({ error: "Could not load your dashboard. Please try again." });
@@ -457,7 +469,7 @@ app.get("/api/demo/:sessionId/brand/claims/:claimId", async (req, res) => {
       return res.status(404).json({ error: "Claim not found" });
     }
 
-    res.json({ claim: { ...claim, registration: { ...claim.registration, unit: { ...claim.registration.unit, purchaseOrder: claim.registration.sale?.purchaseOrder ?? null } } } });
+    res.json({ claim: { ...claim, registration: { ...claim.registration, unit: { ...claim.registration.unit, purchaseOrder: claim.registration.sale?.purchaseOrder ?? claim.registration.unit.purchaseOrder ?? null } } } });
   } catch (error: any) {
     console.error("Brand claim detail error:", error);
     res.status(500).json({ error: error.message || "Failed to load claim detail" });
@@ -1077,18 +1089,20 @@ app.get("/api/demo/:sessionId/brand/registrations", async (req, res) => {
       product ? { unit: { productModelId: product } } : {},
       registrationAttentionWhere(req.query.filter, today), statusWhere, searchWhere,
     ] };
-    const [total, products] = await Promise.all([
-      db.warrantyRegistration.count({ where }),
-      db.productModel.findMany({ where: { brandId: brand.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    ]);
-    const actualPage = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
-    const registrations = await db.warrantyRegistration.findMany({ where, select: {
+    const registrationPage = (pageNumber: number) => db.warrantyRegistration.findMany({ where, select: {
         id: true, active: true, registeredAt: true, coverageStartsOn: true, coverageEndsOn: true,
         customer: { select: { name: true, email: true } },
         unit: { select: { serialNumber: true, productModel: { select: { id: true, name: true, imageUrl: true } }, purchaseOrder: { select: { orderNumber: true } } } },
         sale: { select: { purchaseOrder: { select: { orderNumber: true } } } },
         claim: { select: { id: true, reference: true, status: true } },
-      }, orderBy: [{ registeredAt: "desc" }, { id: "desc" }], skip: (actualPage - 1) * pageSize, take: pageSize });
+      }, orderBy: [{ registeredAt: "desc" }, { id: "desc" }], skip: (pageNumber - 1) * pageSize, take: pageSize });
+    const [total, products, requestedRegistrations] = await Promise.all([
+      db.warrantyRegistration.count({ where }),
+      db.productModel.findMany({ where: { brandId: brand.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      registrationPage(page),
+    ]);
+    const actualPage = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
+    const registrations = actualPage === page ? requestedRegistrations : await registrationPage(actualPage);
     res.json({ brand, registrations: registrations.map(({ sale, ...registration }) => ({ ...registration, unit: { ...registration.unit, purchaseOrder: sale?.purchaseOrder ?? null } })), products, total, page: actualPage, pageSize });
   } catch (error: any) {
     console.error("Brand registrations error:", error);
@@ -1138,6 +1152,7 @@ app.post("/api/demo/:sessionId/brand/settings", async (req, res) => {
         ...(uploadedLogo ? { logoUrl: uploadedLogo } : req.body?.removeLogo ? { logoUrl: null } : {}),
       },
     });
+    invalidateBrand(sessionId);
     if (brand.logoUrl && brand.logoUrl !== updated.logoUrl) await removeNewProductImage(brand.logoUrl);
     res.json({ success: true, brand: updated });
   } catch (error: any) {
@@ -1371,7 +1386,7 @@ app.get("/api/demo/:sessionId/customer/claims/:claimId", async (req, res) => {
       return res.status(404).json({ error: "Claim not found" });
     }
 
-    res.json({ claim: { ...claim, registration: { ...claim.registration, unit: { ...claim.registration.unit, purchaseOrder: claim.registration.sale?.purchaseOrder ?? null } } } });
+    res.json({ claim: { ...claim, registration: { ...claim.registration, unit: { ...claim.registration.unit, purchaseOrder: claim.registration.sale?.purchaseOrder ?? claim.registration.unit.purchaseOrder ?? null } } } });
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to load claim detail" });
   }

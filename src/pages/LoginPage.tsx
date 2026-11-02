@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { VouchLogo } from "@/components/vouch-logo";
 import { apiFetch } from "@/lib/api-fetch";
+import { readApiResponse } from "@/lib/api-response";
 import { useAuth, type Account } from "@/lib/auth-context";
 import "@/app/auth.css";
 
@@ -27,8 +28,7 @@ export default function LoginPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: isBrand ? "BRAND" : "CUSTOMER", username, password, ...(creating ? { displayName, email } : {}) }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not sign in.");
+      const data = await readApiResponse(response);
       await refresh();
       const account = data.account as Account;
       if (account.demoSessionId) localStorage.setItem("vouch-demo-session", account.demoSessionId);
