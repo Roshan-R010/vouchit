@@ -24,7 +24,7 @@ export function ClaimQuickView(props: Props) {
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     closeRef.current?.focus({ preventScroll: true });
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) props.onClose(); };
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("[data-claim-photo-viewer]")) props.onClose(); };
     window.addEventListener("keydown", close);
     return () => { window.removeEventListener("keydown", close); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, [props.onClose]);

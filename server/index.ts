@@ -21,6 +21,16 @@ import { changeUnitLifecycle } from "./unit-lifecycle";
 import { commitBatch, planBatch } from "./advanced-import";
 import { validProfileConfig } from "./import-profile";
 import { updateClaimResolution } from "./claim-resolution";
+import { isLateRegistration, parseRegistrationPolicy, registrationDeadline } from "./registration-policy";
+
+const defaultRegistrationPolicy = { registrationWindowDays: null, lateRegistrationAction: "REJECT" as const };
+function isMissingRegistrationTable(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021";
+}
+async function registrationPolicyForBrand(client: Prisma.TransactionClient | typeof db, brandId: string) {
+  try { return await client.registrationPolicy.findUnique({ where: { brandId } }) ?? defaultRegistrationPolicy; }
+  catch (error) { if (isMissingRegistrationTable(error)) return defaultRegistrationPolicy; throw error; }
+}
 
 // Automatically load environment variables if .env exists
 try {
@@ -119,10 +129,12 @@ app.get("/api/account/customer", async (req, res) => {
     });
     const notificationRegistrations = await db.warrantyRegistration.findMany({ where: { customer: { accountId: account.id } }, select: { id: true, claim: { select: { id: true } } } });
     const notificationIds = notificationRegistrations.flatMap(item => [item.id, ...(item.claim ? [item.claim.id] : [])]);
+    const registrationRequests = await db.registrationRequest.findMany({ where: { customer: { accountId: account.id }, status: { in: ["PENDING", "REJECTED"] } }, include: { productModel: { select: { name: true } }, unit: { select: { serialNumber: true } }, brand: { select: { name: true } } }, orderBy: { requestedAt: "desc" } }).catch(error => { if (isMissingRegistrationTable(error)) return []; throw error; });
     res.json({
       customer: { name: account.displayName, email: account.email },
       brand: { name: "Vouch", slug: "", logoUrl: null },
       availableProducts: [],
+      registrationRequests,
       warranties: registrations.map(r => {
         const remainingDays = daysRemaining(r.coverageEndsOn);
         return {
@@ -1103,7 +1115,7 @@ app.get("/api/demo/:sessionId/brand/settings", async (req, res) => {
   if (!sessionId) return;
   try {
     const brand = await requireBrand(sessionId);
-    res.json({ brand });
+    res.json({ brand, policy: await registrationPolicyForBrand(db, brand.id) });
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to load settings" });
   }
@@ -1130,6 +1142,63 @@ app.post("/api/demo/:sessionId/brand/settings", async (req, res) => {
     res.json({ success: true, brand: updated });
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to update settings" });
+  }
+});
+
+app.put("/api/demo/:sessionId/brand/registration-policy", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  try {
+    const brand = await requireBrand(sessionId);
+    const policy = parseRegistrationPolicy(req.body);
+    const updated = await db.registrationPolicy.upsert({ where: { brandId: brand.id }, create: { brandId: brand.id, ...policy }, update: policy });
+    res.json({ policy: updated });
+  } catch (error) {
+    if (isMissingRegistrationTable(error)) return res.status(503).json({ error: "Registration policy is unavailable until the database migration is applied." });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not save registration policy." });
+  }
+});
+
+app.get("/api/demo/:sessionId/brand/registration-requests", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  try {
+    const brand = await requireBrand(sessionId);
+    const status = ["PENDING", "APPROVED", "REJECTED"].includes(String(req.query.status)) ? String(req.query.status) as "PENDING" | "APPROVED" | "REJECTED" : "PENDING";
+    const requests = await db.registrationRequest.findMany({ where: { brandId: brand.id, status }, include: { customer: { select: { name: true, email: true } }, productModel: { select: { name: true } }, unit: { select: { serialNumber: true } }, sale: { select: { purchaseOrder: { select: { orderNumber: true } } } } }, orderBy: { requestedAt: "desc" } });
+    res.json({ requests });
+  } catch (error) {
+    console.error("Registration requests error:", error);
+    if (isMissingRegistrationTable(error)) return res.status(503).json({ error: "Registration requests are unavailable until the database migration is applied." });
+    res.status(500).json({ error: "Could not load registration requests." });
+  }
+});
+
+app.post("/api/demo/:sessionId/brand/registration-requests/:requestId/review", async (req, res) => {
+  const sessionId = checkSessionId(req, res);
+  if (!sessionId) return;
+  if (!isUuid(req.params.requestId)) return res.status(400).json({ error: "Invalid request." });
+  if (req.body?.action !== "APPROVE" && req.body?.action !== "REJECT") return res.status(400).json({ error: "Choose approve or reject." });
+  const reason = String(req.body?.reason || "").trim();
+  if (reason.length > 500) return res.status(400).json({ error: "Keep the reason within 500 characters." });
+  try {
+    const brand = await requireBrand(sessionId);
+    const request = await db.registrationRequest.findFirst({ where: { id: req.params.requestId, brandId: brand.id }, select: { id: true, unitId: true } });
+    if (!request) return res.status(404).json({ error: "Request not found." });
+    const reviewed = await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "ProductUnit" WHERE id = ${request.unitId}::uuid FOR UPDATE`;
+      const pending = await tx.registrationRequest.findFirst({ where: { id: request.id, brandId: brand.id }, include: { customer: true } });
+      if (!pending || pending.status !== "PENDING") throw new Error("This request has already been reviewed.");
+      if (req.body.action === "APPROVE") {
+        await activateRegistration(tx, { unitId: pending.unitId, saleId: pending.saleId, brandId: brand.id, productModelId: pending.productModelId, customerId: pending.customerId, sessionId, ownerAccountId: pending.customer.accountId, actorAccountId: res.locals.account.id, source: "brand" });
+      } else {
+        await tx.emailOutbox.create({ data: { eventKey: `registration-request-rejected/${pending.id}`, recipient: pending.customer.email, sender: process.env.EMAIL_FROM || "Vouch <onboarding@resend.dev>", subject: "Registration request update", body: "The brand declined your late registration request. Please contact the brand for assistance." } });
+      }
+      return tx.registrationRequest.update({ where: { id: pending.id }, data: { status: req.body.action === "APPROVE" ? "APPROVED" : "REJECTED", reviewedAt: new Date(), reviewerAccountId: res.locals.account.id, rejectionReason: req.body.action === "REJECT" ? reason || null : null } });
+    });
+    res.json({ request: reviewed });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Could not review this request." });
   }
 });
 
@@ -1169,7 +1238,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
       db.brand.findFirst({ where: { demoSessionId: sessionId }, include: { products: { select: { id: true, name: true, slug: true, imageUrl: true, warrantyMonths: true }, orderBy: { name: "asc" } } } }),
     ]);
     if (!customer) {
-      return res.json({ customer: null, brand: workspaceBrand, availableProducts: workspaceBrand?.products || [], warranties: [], notifications: [] });
+      return res.json({ customer: null, brand: workspaceBrand, availableProducts: workspaceBrand?.products || [], warranties: [], registrationRequests: [], notifications: [] });
     }
 
     const registrations = await db.warrantyRegistration.findMany({
@@ -1184,6 +1253,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
 
     const notificationRegistrations = await db.warrantyRegistration.findMany({ where: { customerId: customer.id, unit: { brand: { demoSessionId: sessionId } } }, select: { id: true, claim: { select: { id: true } } } });
     const notificationIds = notificationRegistrations.flatMap(item => [item.id, ...(item.claim ? [item.claim.id] : [])]);
+    const registrationRequests = await db.registrationRequest.findMany({ where: { customerId: customer.id, brand: { demoSessionId: sessionId }, status: { in: ["PENDING", "REJECTED"] } }, include: { productModel: { select: { name: true } }, unit: { select: { serialNumber: true } }, brand: { select: { name: true } } }, orderBy: { requestedAt: "desc" } }).catch(error => { if (isMissingRegistrationTable(error)) return []; throw error; });
     const notifications = await db.demoNotification.findMany({
       where: { demoSessionId: sessionId, recipientLabel: "Customer", relatedId: { in: notificationIds } },
       orderBy: { createdAt: "desc" },
@@ -1234,6 +1304,7 @@ app.get("/api/demo/:sessionId/customer", async (req, res) => {
       customer,
       brand,
       warranties: formattedWarranties,
+      registrationRequests,
       availableProducts: workspaceBrand?.products || [],
       notifications,
     });
@@ -1510,6 +1581,22 @@ app.post("/api/demo/:sessionId/customer/claims/:claimId/reply", async (req, res)
 });
 
 // Register Stamped Unit ID
+async function activateRegistration(tx: Prisma.TransactionClient, input: { unitId: string; saleId: string; brandId: string; productModelId: string; customerId: string; sessionId: string; ownerAccountId: string | null; actorAccountId: string; source: "customer" | "brand" }) {
+  const unit = await tx.productUnit.findFirst({ where: { id: input.unitId, brandId: input.brandId, productModelId: input.productModelId }, include: { productModel: true, brand: true, purchaseOrder: true, registration: true, sales: { where: { isCurrent: true }, include: { purchaseOrder: true } } } });
+  const sale = unit?.sales[0];
+  const customer = await tx.customer.findFirst({ where: { id: input.customerId, accountId: input.ownerAccountId, demoSessionId: input.sessionId } });
+  if (!unit || !customer || unit.status !== "DELIVERED" || unit.registration || !unit.purchaseOrder || unit.purchaseOrder.brandId !== input.brandId || unit.purchaseOrderId !== sale?.purchaseOrderId || sale.id !== input.saleId || (unit.purchaseOrder.customerId && unit.purchaseOrder.customerId !== customer.id)) throw new Error("Unit eligibility or ownership has changed.");
+  if (!sale.confirmedDeliveredOn || dateOnly(sale.confirmedDeliveredOn).getTime() > dateOnly(new Date()).getTime()) throw new Error("This unit needs a confirmed delivery date before registration.");
+  const start = dateOnly(sale.confirmedDeliveredOn);
+  const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
+  const created = await tx.warrantyRegistration.create({ data: { unitId: unit.id, saleId: sale.id, customerId: customer.id, coverageStartsOn: start, coverageEndsOn: end } });
+  await tx.productUnit.update({ where: { id: unit.id }, data: { activeRegistrationId: created.id } });
+  await tx.unitLifecycleEvent.create({ data: { unitId: unit.id, eventType: "REGISTERED", accountId: input.actorAccountId, source: input.source, orderNumber: sale.purchaseOrder.orderNumber } });
+  await tx.demoNotification.create({ data: { demoSessionId: input.sessionId, type: NotificationType.WARRANTY_REGISTERED, recipientLabel: "Customer", subject: "Your warranty is registered", previewBody: `${unit.productModel.name} (${unit.serialNumber}) covered through ${end.toISOString().slice(0, 10)}. Preview — not sent.`, relatedId: created.id } });
+  await tx.emailOutbox.create({ data: { eventKey: `warranty-registered/${created.id}`, recipient: customer.email, sender: process.env.EMAIL_FROM || "Vouch <onboarding@resend.dev>", ...registrationEmail(unit.productModel.name, unit.brand.name, end) } });
+  return created;
+}
+
 app.post("/api/demo/:sessionId/register", async (req, res) => {
   const sessionId = checkSessionId(req, res);
   if (!sessionId) return;
@@ -1558,51 +1645,41 @@ app.post("/api/demo/:sessionId/register", async (req, res) => {
 
     const deliveredOn = unit.sales.find(sale => sale.isCurrent)?.confirmedDeliveredOn;
     if (!deliveredOn || dateOnly(deliveredOn).getTime() > dateOnly(new Date()).getTime()) {
-      return res.status(400).json({ error: "This unit order has not been delivered yet." });
+      return res.status(400).json({ error: "This unit needs a confirmed delivery date before registration. Please contact the brand." });
     }
-
-    const start = dateOnly(deliveredOn);
-    const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
 
     const reg = await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ProductUnit" WHERE id = ${unit.id}::uuid FOR UPDATE`;
       const current = await tx.productUnit.findUniqueOrThrow({ where: { id: unit.id }, select: { status: true, activeRegistrationId: true, purchaseOrderId: true } });
       if (current.status !== "DELIVERED" || current.activeRegistrationId || current.purchaseOrderId !== unit.purchaseOrderId) throw new Error("Unit eligibility changed. Refresh and try again.");
+      const currentSale = await tx.unitSale.findFirst({ where: { unitId: unit.id, isCurrent: true, purchaseOrderId: unit.purchaseOrderId! } });
+      if (!currentSale?.confirmedDeliveredOn || dateOnly(currentSale.confirmedDeliveredOn).getTime() > dateOnly(new Date()).getTime()) throw new Error("This unit needs a confirmed delivery date before registration.");
+      const storage = await tx.$queryRaw<Array<{ policy: string | null; requests: string | null }>>`SELECT to_regclass('"RegistrationPolicy"')::text AS policy, to_regclass('"RegistrationRequest"')::text AS requests`;
+      const policyReady = Boolean(storage[0]?.policy && storage[0]?.requests);
+      const existingRequest = policyReady ? await tx.registrationRequest.findUnique({ where: { saleId: currentSale.id } }) : null;
+      if (existingRequest) {
+        if (existingRequest.customerId !== customer?.id) throw new Error("This unit has a registration request from another customer.");
+        return { requestStatus: existingRequest.status, requestId: existingRequest.id, unitId: unit.id };
+      }
+      const currentBrand = policyReady ? await registrationPolicyForBrand(tx, product.brandId) : defaultRegistrationPolicy;
+      if (currentBrand.registrationWindowDays !== null && isLateRegistration(currentSale.confirmedDeliveredOn, currentBrand.registrationWindowDays) && currentBrand.lateRegistrationAction === "REJECT") return { requestStatus: "LATE_REJECTED", unitId: unit.id };
       const registeredCustomer = customer ?? await tx.customer.create({ data: { demoSessionId: sessionId, accountId: res.locals.account.id, name: cleanName, email: cleanEmail } });
       if (customer) await tx.customer.update({ where: { id: customer.id }, data: { name: cleanName, email: cleanEmail } });
-      const created = await tx.warrantyRegistration.create({
-        data: {
-          unitId: unit.id,
-          saleId: unit.sales.find(sale => sale.isCurrent)?.id,
-          customerId: registeredCustomer.id,
-          coverageStartsOn: start,
-          coverageEndsOn: end,
-        },
-      });
-      await tx.productUnit.update({ where: { id: unit.id }, data: { activeRegistrationId: created.id } });
-      await tx.unitLifecycleEvent.create({ data: { unitId: unit.id, eventType: "REGISTERED", source: "customer", orderNumber: unit.purchaseOrder?.orderNumber } });
-
-      await tx.demoNotification.create({
-        data: {
-          demoSessionId: sessionId,
-          type: NotificationType.WARRANTY_REGISTERED,
-          recipientLabel: "Customer",
-          subject: "Your warranty is registered",
-          previewBody: `${unit.productModel.name} (${cleanSerial}) covered through ${end.toISOString().slice(0, 10)}. Preview — not sent.`,
-          relatedId: created.id,
-        },
-      });
-
-      const email = registrationEmail(unit.productModel.name, product.brand.name, end);
-      await tx.emailOutbox.create({ data: {
-        eventKey: `warranty-registered/${created.id}`,
-        recipient: cleanEmail,
-        sender: process.env.EMAIL_FROM || "Vouch <onboarding@resend.dev>",
-        ...email,
-      } });
+      if (currentBrand.registrationWindowDays !== null && isLateRegistration(currentSale.confirmedDeliveredOn, currentBrand.registrationWindowDays)) {
+        const request = await tx.registrationRequest.create({ data: { brandId: product.brandId, customerId: registeredCustomer.id, productModelId: product.id, unitId: unit.id, saleId: currentSale.id, deliveredOn: dateOnly(currentSale.confirmedDeliveredOn), deadlineOn: registrationDeadline(currentSale.confirmedDeliveredOn, currentBrand.registrationWindowDays), windowDays: currentBrand.registrationWindowDays } });
+        await tx.emailOutbox.create({ data: { eventKey: `registration-request-submitted/${request.id}`, recipient: registeredCustomer.email, sender: process.env.EMAIL_FROM || "Vouch <onboarding@resend.dev>", subject: "Registration request received", body: `Your late registration request for ${unit.productModel.name} was sent to ${product.brand.name} for review. Warranty coverage is not active yet.` } });
+        if (product.brand.supportEmail) await tx.emailOutbox.create({ data: { eventKey: `registration-request-brand/${request.id}`, recipient: product.brand.supportEmail, sender: process.env.EMAIL_FROM || "Vouch <onboarding@resend.dev>", subject: "Late registration request", body: `A late registration request for ${unit.productModel.name} is waiting in your Vouch Registration Requests workspace.` } });
+        return { requestStatus: "PENDING", requestId: request.id, unitId: unit.id };
+      }
+      const created = await activateRegistration(tx, { unitId: unit.id, saleId: currentSale.id, brandId: product.brandId, productModelId: product.id, customerId: registeredCustomer.id, sessionId, ownerAccountId: res.locals.account.id, actorAccountId: res.locals.account.id, source: "customer" });
       return created;
     });
 
+    if ("requestStatus" in reg) {
+      if (reg.requestStatus === "PENDING") return res.json({ success: true, pending: true, unitId: unit.id, requestId: reg.requestId, message: "Registration request submitted. The brand will review your request." });
+      if (reg.requestStatus === "LATE_REJECTED") return res.status(403).json({ error: "Your product's registration period has expired. Please contact the brand for assistance." });
+      return res.status(409).json({ error: reg.requestStatus === "REJECTED" ? "Your registration request was rejected. Please contact the brand for assistance." : "This unit has already been registered." });
+    }
     res.json({ success: true, unitId: unit.id, registration: reg });
   } catch (error: any) {
     console.error("Register warranty error:", error);

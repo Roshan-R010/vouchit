@@ -16,6 +16,7 @@ const messages: Record<string, string> = {
   missing: "Enter the stamped unit ID to continue.",
   "not-found": "We couldn’t find that unit for this product. Check the ID and try again.",
   "not-delivered": "Delivery has not been recorded for this unit yet. Please contact the brand before registering.",
+  "registration-period-expired": "Your product's registration period has expired. Please contact the brand for assistance.",
   contact: "Enter your name and a valid contact email.",
 };
 

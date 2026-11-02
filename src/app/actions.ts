@@ -5,6 +5,7 @@ import { addCalendarMonths, dateOnly, isCoverageActive } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isLateRegistration } from "../../server/registration-policy";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const text = (form: FormData, name: string) => String(form.get(name) || "").trim();
@@ -24,7 +25,7 @@ export async function registerWarrantyAction(formData: FormData) {
   if (!customerName || customerName.length > 100 || email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("contact");
   const unit = await db.productUnit.findFirst({
     where: { serialNumber, brand: { slug: brandSlug, demoSessionId: sessionId }, productModel: { slug: productSlug } },
-    include: { productModel: true, purchaseOrder: true, registration: true, sales: { orderBy: { createdAt: "desc" } } },
+    include: { productModel: true, brand: true, purchaseOrder: true, registration: true, sales: { orderBy: { createdAt: "desc" } } },
   });
   if (!unit) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-found`);
   const customer = await db.customer.findFirst({ where: { demoSessionId: sessionId, email } });
@@ -38,13 +39,24 @@ export async function registerWarrantyAction(formData: FormData) {
   const currentSale = unit.sales.find(sale => sale.isCurrent);
   const deliveredOn = currentSale?.confirmedDeliveredOn;
   if (!deliveredOn || dateOnly(deliveredOn).getTime() > dateOnly(new Date()).getTime()) redirect(`${registrationPath}?serialNumber=${encodeURIComponent(serialNumber)}&error=not-delivered`);
-  const start = dateOnly(deliveredOn);
-  const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
+  let policyAvailable = true;
+  const policy = await db.registrationPolicy.findUnique({ where: { brandId: unit.brandId } }).catch(error => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021") { policyAvailable = false; return null; }
+    throw error;
+  });
+  if (policy?.registrationWindowDays != null && isLateRegistration(deliveredOn, policy.registrationWindowDays)) fail("registration-period-expired");
   try {
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ProductUnit" WHERE id = ${unit.id}::uuid FOR UPDATE`;
       const current = await tx.productUnit.findUniqueOrThrow({ where: { id: unit.id }, select: { status: true, activeRegistrationId: true, purchaseOrderId: true } });
       if (current.status !== "DELIVERED" || current.activeRegistrationId || current.purchaseOrderId !== unit.purchaseOrderId) fail("not-found");
+      const currentSaleRecord = await tx.unitSale.findFirst({ where: { unitId: unit.id, isCurrent: true, purchaseOrderId: unit.purchaseOrderId! } });
+      const currentPolicy = policyAvailable ? await tx.registrationPolicy.findUnique({ where: { brandId: unit.brandId } }) : null;
+      const confirmedDeliveredOn = currentSaleRecord?.confirmedDeliveredOn;
+      if (!confirmedDeliveredOn) return fail("not-delivered");
+      if (currentPolicy?.registrationWindowDays != null && isLateRegistration(confirmedDeliveredOn, currentPolicy.registrationWindowDays)) return fail("registration-period-expired");
+      const start = dateOnly(confirmedDeliveredOn);
+      const end = addCalendarMonths(start, unit.productModel.warrantyMonths);
       const registeredCustomer = customer ?? await tx.customer.create({ data: { demoSessionId: sessionId, name: customerName, email } });
       if (customer) await tx.customer.update({ where: { id: customer.id }, data: { name: customerName, email } });
       const registration = await tx.warrantyRegistration.create({ data: { unitId: unit.id, saleId: currentSale?.id, customerId: registeredCustomer.id, coverageStartsOn: start, coverageEndsOn: end } });

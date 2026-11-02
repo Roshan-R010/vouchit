@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import EntryPage from "./pages/EntryPage";
 import LoginPage from "./pages/LoginPage";
@@ -38,6 +38,11 @@ function RequireRole({ role, children }: { role: "BRAND" | "CUSTOMER"; children:
   return <>{children}</>;
 }
 
+function RegistrationRequestsRedirect() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  return <Navigate to={`/demo/${sessionId}/brand/registrations?view=requests`} replace />;
+}
+
 export function App() {
   return (
     <Routes>
@@ -60,6 +65,7 @@ export function App() {
         <Route path="products/:productId" element={<BrandProductDetail />} />
         <Route path="customers" element={<BrandCustomers />} />
         <Route path="registrations" element={<BrandRegistrations />} />
+        <Route path="registration-requests" element={<RegistrationRequestsRedirect />} />
         <Route path="analytics" element={<BrandAnalytics />} />
         <Route path="settings" element={<BrandSettings />} />
       </Route>

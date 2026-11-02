@@ -40,6 +40,17 @@ enum AccountRole {
   CUSTOMER
 }
 
+enum LateRegistrationAction {
+  REJECT
+  MANUAL_REVIEW
+}
+
+enum RegistrationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Account {
   id           String        @id @default(uuid()) @db.Uuid
   username     String        @unique
@@ -51,6 +62,7 @@ model Account {
   createdAt    DateTime      @default(now())
   sessions     AuthSession[]
   customers    Customer[]
+  reviewedRegistrationRequests RegistrationRequest[] @relation("RegistrationRequestReviewer")
 }
 
 model AuthSession {
@@ -78,12 +90,14 @@ model Brand {
   slug          String
   supportEmail  String?
   logoUrl       String?
+  registrationPolicy RegistrationPolicy?
   demoSession   DemoSession    @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
   products      ProductModel[]
   orders        PurchaseOrder[]
   units         ProductUnit[]
   unitImports   UnitImport[]
   importProfiles ImportProfile[]
+  registrationRequests RegistrationRequest[]
   @@unique([demoSessionId, slug])
 }
 
@@ -100,6 +114,7 @@ model ProductModel {
   verificationMode RegistrationVerificationMode @default(UNIT_ONLY)
   brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
   units          ProductUnit[]
+  registrationRequests RegistrationRequest[]
   @@unique([brandId, slug])
 }
 
@@ -113,6 +128,7 @@ model Customer {
   demoSession   DemoSession           @relation(fields: [demoSessionId], references: [id], onDelete: Cascade)
   orders        PurchaseOrder[]
   registrations WarrantyRegistration[]
+  registrationRequests RegistrationRequest[]
   @@unique([demoSessionId, email])
   @@index([accountId])
 }
@@ -148,6 +164,7 @@ model ProductUnit {
   sales          UnitSale[]
   events         UnitLifecycleEvent[]
   replacementResolutions ClaimResolution[]
+  registrationRequests RegistrationRequest[]
   @@unique([brandId, serialNumber])
   @@index([brandId, productModelId])
   @@index([brandId, purchaseOrderId])
@@ -172,8 +189,41 @@ model UnitSale {
   unit                ProductUnit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
   purchaseOrder       PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   registrations       WarrantyRegistration[]
+  registrationRequest RegistrationRequest?
   @@index([unitId, createdAt])
   @@index([purchaseOrderId])
+}
+
+model RegistrationRequest {
+  id             String @id @default(uuid()) @db.Uuid
+  brandId        String @db.Uuid
+  customerId     String @db.Uuid
+  productModelId String @db.Uuid
+  unitId         String @db.Uuid
+  saleId         String @unique @db.Uuid
+  deliveredOn    DateTime @db.Date
+  deadlineOn     DateTime @db.Date
+  windowDays     Int
+  status         RegistrationRequestStatus @default(PENDING)
+  requestedAt    DateTime @default(now())
+  reviewedAt     DateTime?
+  reviewerAccountId String? @db.Uuid
+  rejectionReason String?
+  brand          Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productModel   ProductModel @relation(fields: [productModelId], references: [id], onDelete: Cascade)
+  unit           ProductUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  sale           UnitSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  reviewer       Account? @relation("RegistrationRequestReviewer", fields: [reviewerAccountId], references: [id], onDelete: SetNull)
+  @@index([brandId, status, requestedAt])
+  @@index([customerId, requestedAt])
+}
+
+model RegistrationPolicy {
+  brandId String @id @db.Uuid
+  registrationWindowDays Int?
+  lateRegistrationAction LateRegistrationAction @default(REJECT)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 }
 
 model UnitLifecycleEvent {

@@ -54,7 +54,7 @@ export default function CustomerRegisterPortal() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Registration failed. Check your serial number.");
-      navigate("/customer", { replace: true });
+      navigate("/customer", { replace: true, state: result.pending ? { notice: result.message } : undefined });
     } catch (cause: any) { setError(cause.message || "Failed to register this product."); }
     finally { setSubmitting(false); }
   }

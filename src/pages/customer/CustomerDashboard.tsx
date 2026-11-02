@@ -2,12 +2,13 @@ import { apiFetch } from "@/lib/api-fetch";
 import { ProductPhoto } from "@/components/product-photo";
 import { BrandIdentityHeader } from "@/components/brand-identity-header";
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowUpRight, Box } from "lucide-react";
 import { formatDate } from "@/lib/dates";
 
 export function CustomerDashboard() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const location = useLocation();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "active" | "expired">("all");
@@ -47,6 +48,7 @@ export function CustomerDashboard() {
 
   const brand = data?.brand || { name: "Your brand", slug: "" };
   const warranties: any[] = data?.warranties || [];
+  const registrationRequests: any[] = data?.registrationRequests || [];
 
   const filteredWarranties = warranties.filter((w) => {
     if (filter === "active") return w.isActive;
@@ -62,6 +64,8 @@ export function CustomerDashboard() {
         title="Your warranties, in one place."
         description="See the products you have registered, check your remaining coverage, and follow your support claims."
       />
+      {location.state?.notice && <div className="business-notice" role="status">{location.state.notice}</div>}
+      {registrationRequests.length > 0 && <section style={{ margin: "24px 0" }} aria-label="Registration requests"><h2>Registration requests</h2><div className="product-grid">{registrationRequests.map(request => <article className="product-card" key={request.id} style={{ padding: 20 }}><span className={`badge ${request.status === "REJECTED" ? "expired" : ""}`}>{request.status === "PENDING" ? "Pending brand review" : "Rejected"}</span><h3>{request.productModel.name}</h3><p>{request.brand.name} · Unit {request.unit.serialNumber}</p><p>Requested {formatDate(request.requestedAt)}</p><p>{request.status === "PENDING" ? "The brand will review your request. Warranty coverage is not active yet." : "Please contact the brand for assistance."}</p></article>)}</div></section>}
 
       {/* Filters and Registration Action */}
       <div className="filters">

@@ -5,6 +5,7 @@ import { replyToInfoRequestAction } from "@/app/actions";
 import { db } from "@/lib/db";
 import { daysRemaining, formatDate } from "@/lib/dates";
 import { ClaimStatus } from "@prisma/client";
+import { ClaimPhotoGallery } from "@/components/claim-photo-gallery";
 
 type Props={params:Promise<{sessionId:string;claimId:string}>};
 const stateLabel:Record<ClaimStatus,string>={SUBMITTED:"Submitted",UNDER_REVIEW:"In review",INFO_REQUESTED:"More information needed",APPROVED:"Approved",REJECTED:"Rejected",RESOLVED:"Resolved"};
@@ -21,7 +22,7 @@ export default async function ClaimTrackingPage({params}:Props){
     <div className="timeline">{steps.map((step,i)=><div key={step} className={`timeline-step ${i<activeIndex?"complete":""} ${i===activeIndex?"current":""}`}><div className="timeline-marker"/>{step}</div>)}</div>
     {claim.resolution && <section className="claim-info"><h3>{claim.resolution.type.toLowerCase()} progress</h3><p>{claim.resolution.step.toLowerCase().replaceAll("_", " ")} · {claim.resolution.status.toLowerCase().replaceAll("_", " ")}</p>{claim.resolution.trackingNumber && <p>Tracking: {claim.resolution.trackingNumber}</p>}{claim.resolution.courier && <p>Courier: {claim.resolution.courier}</p>}{claim.resolution.refundAmount && <p>Refund: {claim.resolution.refundCurrency} {String(claim.resolution.refundAmount)}</p>}{claim.resolution.replacementUnit && <p>Replacement Unit ID: {claim.resolution.replacementUnit.serialNumber}</p>}{claim.resolution.events.map(event => <div key={event.id} className="message">{event.toStep.toLowerCase().replaceAll("_", " ")} · {formatDate(event.createdAt)}{event.customerMessage && <p>{event.customerMessage}</p>}</div>)}</section>}
     <div className="claim-info"><h3>Claim details</h3><div className="info-row"><span>Product</span><span>{claim.registration.unit.productModel.name}</span></div><div className="info-row"><span>Unit ID</span><span>{claim.registration.unit.serialNumber}</span></div><div className="info-row"><span>Issue</span><span>{claim.issueTitle}</span></div><div className="info-row"><span>Warranty</span><span>{remaining} days remaining · ends {formatDate(claim.registration.coverageEndsOn)}</span></div><div className="info-row"><span>Submitted on</span><span>{formatDate(claim.submittedAt)}</span></div><div className="message">{claim.description}</div>
-      {claim.attachments.length > 0 && <div className="claim-photos">{claim.attachments.map((photo, i) => <a key={photo.id} href={photo.fileKey} target="_blank" rel="noreferrer"><img src={photo.fileKey} alt={`Claim photo ${i + 1}`}/></a>)}</div>}
+      {claim.attachments.length > 0 && <ClaimPhotoGallery photos={claim.attachments.map(photo => ({ id: photo.id, url: photo.fileKey }))}/>}
       {claim.events.map((event)=><div className="message" key={event.id}><strong>{stateLabel[event.toStatus]}</strong> · {event.note||"Claim updated"}<div className="muted" style={{fontSize:10,marginTop:5}}>{formatDate(event.createdAt)}</div></div>)}
       {latestBrandMessage&&<div className="message"><strong>Message from {claim.registration.unit.brand.name}</strong><p style={{margin:"6px 0 0"}}>{latestBrandMessage.body}</p></div>}
     </div>

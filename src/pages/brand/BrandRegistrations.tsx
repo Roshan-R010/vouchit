@@ -7,6 +7,7 @@ import { dateOnly, daysRemaining, formatDate, isCoverageActive } from "@/lib/dat
 import { shortClaimReference } from "@/lib/claim-reference";
 import { ProductPhoto } from "@/components/product-photo";
 import { Select } from "@/components/select";
+import BrandRegistrationRequests from "./BrandRegistrationRequests";
 import styles from "./brand-registrations.module.css";
 
 type Registration = {
@@ -32,6 +33,7 @@ function ClaimLink({ registration, sessionId }: { registration: Registration; se
 export function BrandRegistrations() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestsView = searchParams.get("view") === "requests";
   const product = searchParams.get("product") || "";
   const filter = searchParams.get("filter") || "";
   const status = searchParams.get("status") || (filter === "expiring" ? "expiring" : "");
@@ -63,7 +65,7 @@ export function BrandRegistrations() {
     return () => window.clearTimeout(timer);
   }, [searchInput, search, searchParams, setSearchParams]);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || requestsView) return;
     let active = true;
     setLoading(true); setError("");
     const query = new URLSearchParams();
@@ -77,7 +79,7 @@ export function BrandRegistrations() {
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Could not load registrations."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [sessionId, product, status, search, filter, requestedPage, revision]);
+  }, [sessionId, product, status, search, filter, requestedPage, revision, requestsView]);
   useEffect(() => {
     if (!selected) return;
     closeButton.current?.focus();
@@ -117,7 +119,13 @@ export function BrandRegistrations() {
   const emptyTitle = search ? "No matching registrations" : product ? "No registrations for this product" : hasFilters ? "No registrations found" : "No registered products yet";
   const emptyText = search ? "Try searching using another unit ID, order ID, customer name, or email." : product ? "Try another product or clear your filters." : hasFilters ? "No registered units match your selected filters." : "Customer warranty registrations will appear here.";
 
+  if (requestsView) return <div className={styles.page}>
+    <nav className={styles.sectionTabs} aria-label="Registration sections"><button type="button" className={styles.sectionTab} onClick={() => setSearchParams({})}>Warranty registrations</button><button type="button" className={`${styles.sectionTab} ${styles.sectionTabActive}`} aria-current="page">Registration requests</button></nav>
+    <BrandRegistrationRequests embedded/>
+  </div>;
+
   return <div className={styles.page}>
+    <nav className={styles.sectionTabs} aria-label="Registration sections"><button type="button" className={`${styles.sectionTab} ${styles.sectionTabActive}`} aria-current="page">Warranty registrations</button><button type="button" className={styles.sectionTab} onClick={() => setSearchParams({ view: "requests" })}>Registration requests</button></nav>
     <header className={styles.heading}>
       <div className={styles.intro}><span className={styles.eyebrow}>Warranty ledger</span><h1>Warranty Registrations</h1><p>Track registered units and verify customer warranty coverage.</p></div>
       <div className={styles.controls}>
